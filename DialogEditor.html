@@ -65,6 +65,7 @@
         button:hover { background: var(--border); }
         button.primary { background: var(--accent); color: white; border: none; }
         button.full-width { width: 100%; text-align: center; margin-bottom: 5px; padding: 8px; }
+        button.small { padding: 2px 6px; font-size: 10px; height: 20px; }
         
         /* Icon Button Helper */
         button.icon-btn { padding: 4px; }
@@ -133,6 +134,25 @@
         }
         .graph-layer { position: absolute; top: 0; left: 0; transform-origin: 0 0; width: 0; height: 0; }
         
+        /* Dialog Vars Overlay */
+        .dialog-vars-overlay {
+            position: absolute; top: 10px; left: 10px;
+            width: 280px; background: var(--bg-panel); 
+            border: 1px solid var(--border); border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 5;
+            display: flex; flex-direction: column;
+        }
+        .dialog-vars-header {
+            padding: 8px 12px; background: var(--bg-header); 
+            font-weight: 600; font-size: 13px; cursor: pointer;
+            display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+        }
+        .dialog-vars-body {
+            padding: 10px; overflow-y: auto; max-height: 400px;
+            background: var(--bg-dark);
+        }
+
         /* Selection Rect */
         .selection-rect {
             position: fixed;
@@ -145,7 +165,7 @@
         /* Nodes */
         .node {
             position: absolute; 
-            min-width: 240px; width: auto; 
+            min-width: 200px; width: auto; 
             background: var(--bg-node); border: 1px solid var(--border);
             border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column;
             z-index: 2; transition: left 0.05s, top 0.05s;
@@ -215,13 +235,26 @@
         .tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #333; margin: 0; cursor:pointer; display: inline-flex; align-items: center; justify-content: center;}
         .tag.active { background: var(--accent); color: white; }
         
-        /* Context Menu */
+        /* Context Menu (Reworked) */
         .context-menu {
-            position: fixed; width: 200px; background: var(--bg-panel); border: 1px solid var(--border);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 50; padding: 4px; border-radius: 4px;
+            position: fixed; width: 220px; background: var(--bg-panel); border: 1px solid var(--border);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6); z-index: 50; padding: 4px; border-radius: 6px;
+            display: flex; flex-direction: column;
         }
-        .context-item { padding: 8px 12px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; border-radius: 4px; }
+        .ctx-search {
+            background: #111; border: 1px solid #333; padding: 6px; color: var(--text-main);
+            width: 100%; font-size: 12px; border-radius: 4px; margin-bottom: 4px;
+        }
+        .ctx-group-label {
+            font-size: 10px; font-weight: 600; color: #666; text-transform: uppercase;
+            padding: 4px 8px; margin-top: 4px; letter-spacing: 0.5px;
+        }
+        .context-item { 
+            padding: 6px 12px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; border-radius: 4px; 
+            transition: background 0.1s;
+        }
         .context-item:hover { background: var(--accent); color: white; }
+        .context-item .icon { font-size: 16px; opacity: 0.8; }
 
         /* Validation */
         .warning-icon { color: var(--error); cursor: help; margin-right: 4px; animation: pulse 2s infinite; }
@@ -503,6 +536,52 @@
         
         <div class="grid-layer" :style="{ backgroundPosition: `${pan.x}px ${pan.y}px`, backgroundSize: `${editor.gridSize * zoom}px ${editor.gridSize * zoom}px` }"></div>
         
+        <div class="dialog-vars-overlay" @mousedown.stop @wheel.stop>
+            <div class="dialog-vars-header" @click="ui.overlayCollapsed = !ui.overlayCollapsed">
+                <span class="flex center gap-sm">
+                    <span class="icon">{{ ui.overlayCollapsed ? 'expand_more' : 'expand_less' }}</span>
+                    Dialog Variables
+                </span>
+                <button class="icon-btn" title="Add Dialog Variable" @click.stop="addDialogVariable"><span class="icon">add</span></button>
+            </div>
+            <div v-if="!ui.overlayCollapsed" class="dialog-vars-body">
+                <div v-if="!activeDialog" class="text-sm text-muted">No dialog selected</div>
+                <div v-else-if="!activeDialog.variables || activeDialog.variables.length === 0" class="text-sm text-muted" style="text-align:center; padding:5px">No local variables</div>
+                
+                <div v-if="activeDialog" v-for="v in activeDialog.variables" :key="v.id" class="list-item" style="display:block; cursor:default; background: #222; margin-bottom:5px; border:1px solid #333">
+                    <div class="flex gap-sm center">
+                        <span v-if="validationErrors[v.id]" class="icon warning-icon" style="font-size:12px" :title="validationErrors[v.id].join('\n')">warning</span>
+                        <input v-model="v.name" class="text-sm grow" :class="{error: validationErrors[v.id]}" placeholder="Name" @change="markActiveDirty">
+                        <button class="icon-btn" title="Delete" @click="deleteDialogVariable(v.id)"><span class="icon">close</span></button>
+                    </div>
+                    <div class="flex gap-sm mt-1 center">
+                        <select v-model="v.type" class="text-sm" style="width: 70px;">
+                            <option value="bool">Bool</option>
+                            <option value="int">Int</option>
+                            <option value="float">Float</option>
+                            <option value="string">Str</option>
+                        </select>
+                        
+                        <div class="flex center" title="Reset on Dialog Start?">
+                            <input type="checkbox" :id="'dvr-'+v.id" v-model="v.resetOnStart" @change="markActiveDirty">
+                            <label :for="'dvr-'+v.id" class="text-sm text-muted ml-1" style="font-size:10px; cursor:pointer">Rst</label>
+                        </div>
+
+                        <template v-if="v.type === 'bool'">
+                            <div class="grow flex center">
+                                <input type="checkbox" :id="'dvar-'+v.id" class="toggle-checkbox" v-model="v.value" true-value="true" false-value="false">
+                                <label :for="'dvar-'+v.id" class="toggle-label"></label>
+                                <span class="text-sm ml-2">{{ v.value === 'true' ? 'True' : 'False' }}</span>
+                            </div>
+                        </template>
+                        <template v-else>
+                            <input v-model="v.value" class="text-sm grow" placeholder="Def">
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div v-if="selectionRect.visible" class="selection-rect" 
              :style="{ left: selectionRect.x + 'px', top: selectionRect.y + 'px', width: selectionRect.w + 'px', height: selectionRect.h + 'px' }">
         </div>
@@ -547,7 +626,14 @@
 
                     <span class="icon" v-html="getNodeIcon(node.type)"></span>
                     {{ node.type }}
+                    
                     <div class="grow"></div>
+                    
+                    <div v-if="['And','NAnd','Or','NOr','XOr'].includes(node.type)" class="flex center gap-sm mr-2">
+                        <button class="small icon-btn" @click.stop="remLogicInput(node)" title="Remove Input"><span class="icon" style="font-size:14px">remove</span></button>
+                        <button class="small icon-btn" @click.stop="addLogicInput(node)" title="Add Input"><span class="icon" style="font-size:14px">add</span></button>
+                    </div>
+
                     <span v-if="node.type !== 'Start'" class="icon" style="font-size:14px; cursor:pointer;" @click.stop="deleteNode(node.id)">close</span>
                 </div>
 
@@ -583,6 +669,10 @@
                                 <input v-model="ans.key" class="text-sm" style="font-size:10px; padding:1px; background:none; border:none; color:#888; width:100%" placeholder="Key" @change="markActiveDirty">
                              </div>
                              <div class="flex center gap-sm">
+                                 <div class="socket-hitbox" :id="'soc-' + node.id + '-in_ans_cond_' + idx" :class="{'can-drop': canDrop('in', 'data')}"
+                                      @mousedown.stop="startConnect(node.id, 'in_ans_cond_' + idx, 'data', $event)" @mouseup.stop="finishConnect(node.id, 'in_ans_cond_' + idx, 'data')">
+                                     <div class="socket data" title="Condition (Bool)"></div>
+                                 </div>
                                  <input v-model="ans.translations[project.settings.currentLang]" class="text-sm grow" placeholder="Answer..." :class="{error: !ans.translations[project.settings.currentLang]}" @change="markActiveDirty">
                                  <button class="icon-btn" title="Remove Answer" @click="removeAnswer(node, idx)"><span class="icon">remove</span></button>
                                  <div class="socket-hitbox" :id="'soc-' + node.id + '-out_ans_' + idx" :class="{'can-drop': canDrop('out', 'flow')}"
@@ -616,6 +706,9 @@
                          <div class="socket-row left"><div class="socket-hitbox" :id="'soc-' + node.id + '-in'" :class="{'can-drop': canDrop('in', 'flow')}" @mousedown.stop="startConnect(node.id, 'in', 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'in', 'flow')"><div class="socket flow"></div></div><span class="text-sm ml-2">In</span></div>
                         <select v-model="node.data.variableId" class="text-sm" @change="onSetVarChange(node); markActiveDirty()" :class="{error: !node.data.variableId}">
                             <option :value="null">Select Var...</option>
+                            <optgroup label="Dialog (Local)" v-if="activeDialog">
+                                <option v-for="v in activeDialog.variables" :value="v.id"># - {{ v.name }}</option>
+                            </optgroup>
                             <optgroup label="Global"><option v-for="v in project.variables" :value="v.id">{{ v.name }}</option></optgroup>
                             <optgroup v-for="c in project.characters" :label="c.name"><option v-for="v in c.variables" :value="v.id">{{ c.name + "." + v.name }}</option></optgroup>
                         </select>
@@ -635,11 +728,15 @@
                             </template>
                         </div>
                         <div class="socket-row right"><span class="text-sm mr-2">Out</span><div class="socket-hitbox" :id="'soc-' + node.id + '-out'" :class="{'can-drop': canDrop('out', 'flow')}" @mousedown.stop="startConnect(node.id, 'out', 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'out', 'flow')"><div class="socket flow"></div></div></div>
+                        <div class="socket-row right mt-2"><span class="text-sm mr-2 text-muted">Val</span><div class="socket-hitbox" :id="'soc-' + node.id + '-out_val'" :class="{'can-drop': canDrop('out', 'data')}" @mousedown.stop="startConnect(node.id, 'out_val', 'data', $event)" @mouseup.stop="finishConnect(node.id, 'out_val', 'data')"><div class="socket data"></div></div></div>
                     </div>
 
                     <div v-if="node.type === 'GetVar'">
                          <select v-model="node.data.variableId" class="text-sm" :class="{error: !node.data.variableId}" @change="markActiveDirty">
                             <option :value="null">Select Var...</option>
+                            <optgroup label="Dialog (Local)" v-if="activeDialog">
+                                <option v-for="v in activeDialog.variables" :value="v.id"># - {{ v.name }}</option>
+                            </optgroup>
                             <optgroup label="Global"><option v-for="v in project.variables" :value="v.id">{{ v.name }}</option></optgroup>
                             <optgroup v-for="c in project.characters" :label="c.name"><option v-for="v in c.variables" :value="v.id">{{ c.name + "." + v.name }}</option></optgroup>
                         </select>
@@ -678,18 +775,35 @@
 
                         <div class="socket-row right mt-2"><span class="text-sm mr-2">True</span><div class="socket-hitbox" :id="'soc-' + node.id + '-out_true'" :class="{'can-drop': canDrop('out', 'flow')}" @mousedown.stop="startConnect(node.id, 'out_true', 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'out_true', 'flow')"><div class="socket flow"></div></div></div>
                         <div class="socket-row right"><span class="text-sm mr-2">False</span><div class="socket-hitbox" :id="'soc-' + node.id + '-out_false'" :class="{'can-drop': canDrop('out', 'flow')}" @mousedown.stop="startConnect(node.id, 'out_false', 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'out_false', 'flow')"><div class="socket flow"></div></div></div>
+                        <div class="socket-row right mt-2"><span class="text-sm mr-2 text-muted">Result</span><div class="socket-hitbox" :id="'soc-' + node.id + '-out_val'" :class="{'can-drop': canDrop('out', 'data')}" @mousedown.stop="startConnect(node.id, 'out_val', 'data', $event)" @mouseup.stop="finishConnect(node.id, 'out_val', 'data')"><div class="socket data"></div></div></div>
                     </div>
+
+                    <div v-if="['And','NAnd','Or','NOr','XOr'].includes(node.type)">
+                        <div v-for="n in node.data.inputCount" :key="n" class="socket-row left mb-1">
+                            <div class="socket-hitbox" :id="'soc-' + node.id + '-in_' + (n-1)" :class="{'can-drop': canDrop('in', 'data')}" @mousedown.stop="startConnect(node.id, 'in_' + (n-1), 'data', $event)" @mouseup.stop="finishConnect(node.id, 'in_' + (n-1), 'data')"><div class="socket data"></div></div>
+                            <span class="text-sm ml-2">In {{n}}</span>
+                        </div>
+                        <div class="socket-row right mt-2"><span class="text-sm mr-2">True</span><div class="socket-hitbox" :id="'soc-' + node.id + '-out_true'" :class="{'can-drop': canDrop('out', 'flow')}" @mousedown.stop="startConnect(node.id, 'out_true', 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'out_true', 'flow')"><div class="socket flow"></div></div></div>
+                        <div class="socket-row right"><span class="text-sm mr-2">False</span><div class="socket-hitbox" :id="'soc-' + node.id + '-out_false'" :class="{'can-drop': canDrop('out', 'flow')}" @mousedown.stop="startConnect(node.id, 'out_false', 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'out_false', 'flow')"><div class="socket flow"></div></div></div>
+                        <div class="socket-row right mt-2"><span class="text-sm mr-2 text-muted">Result</span><div class="socket-hitbox" :id="'soc-' + node.id + '-out_val'" :class="{'can-drop': canDrop('out', 'data')}" @mousedown.stop="startConnect(node.id, 'out_val', 'data', $event)" @mouseup.stop="finishConnect(node.id, 'out_val', 'data')"><div class="socket data"></div></div></div>
+                    </div>
+
                 </div>
             </div>
         </div>
 
-        <div v-if="ui.contextMenu.visible" class="context-menu" :style="{ left: ui.contextMenu.x + 'px', top: ui.contextMenu.y + 'px' }" @mousedown.stop>
+        <div v-if="ui.contextMenu.visible" class="context-menu" :style="{ left: ui.contextMenu.x + 'px', top: ui.contextMenu.y + 'px' }" @mousedown.stop @wheel.stop>
             <template v-if="ui.contextMenu.type === 'canvas'">
-                <div class="context-item" @click="addNode('Text')"><span class="icon">chat_bubble</span> Text Node</div>
-                <div class="context-item" @click="addNode('SetVar')"><span class="icon">edit</span> Set Variable</div>
-                <div class="context-item" @click="addNode('GetVar')"><span class="icon">data_object</span> Get Variable</div>
-                <div class="context-item" @click="addNode('Compare')"><span class="icon">balance</span> Compare</div>
-                <div class="context-item" @click="addNode('End')"><span class="icon">stop</span> End / Switch</div>
+                <input v-model="ui.searchQuery" ref="ctxSearch" class="ctx-search" placeholder="Search nodes..." @keydown.stop>
+                <div style="overflow-y:auto; max-height:250px">
+                    <div v-for="(group, gName) in filteredMenuItems" :key="gName">
+                        <div class="ctx-group-label" v-if="group.items.length > 0">{{ group.label }}</div>
+                        <div v-for="item in group.items" :key="item.type" class="context-item" @click="addNode(item.type)">
+                            <span class="icon">{{ item.icon }}</span> {{ item.label }}
+                        </div>
+                    </div>
+                    <div v-if="Object.keys(filteredMenuItems).length === 0" style="padding:8px; text-align:center; font-size:12px; color:#666">No results</div>
+                </div>
                 <hr style="border-color:#444; margin:4px 0" v-if="selectedNodeIds.size > 0">
                 <div class="context-item" @click="createGroup" v-if="selectedNodeIds.size > 0"><span class="icon">workspaces</span> Create Group</div>
                 <div class="context-item" @click="detachFromGroup" v-if="hasGroupedNodesSelected()"><span class="icon">link_off</span> Detach from Group</div>
@@ -846,8 +960,11 @@ const app = createApp({
         const activeDialogId = ref(1);
         const ui = reactive({
             sections: { settings: true, vars: true, chars: true, dialogs: true },
-            contextMenu: { visible: false, x: 0, y: 0, type: 'canvas', item: null }
+            contextMenu: { visible: false, x: 0, y: 0, type: 'canvas', item: null },
+            overlayCollapsed: false,
+            searchQuery: ''
         });
+        const ctxSearch = ref(null);
 
         // GLOBAL UI STATE
         const expandedFolderIds = reactive(new Set());
@@ -1059,6 +1176,19 @@ const app = createApp({
 
         const validateDialog = (dialog) => {
             if (!dialog) return;
+            
+            // Validate Dialog Variables
+            if(dialog.variables) {
+                const dVarNames = new Set();
+                dialog.variables.forEach(v => {
+                    const vErrs = [];
+                    if(!v.name || v.name.trim() === '') vErrs.push("Variable name cannot be empty.");
+                    if(dVarNames.has(v.name)) vErrs.push("Duplicate variable name.");
+                    dVarNames.add(v.name);
+                    setError(v.id, vErrs);
+                });
+            }
+
             const conns = dialog.connections;
             const isConnected = (nodeId, socket) => {
                 return conns.some(c => (c.fromNode === nodeId && c.fromSocket === socket) || (c.toNode === nodeId && c.toSocket === socket));
@@ -1105,6 +1235,10 @@ const app = createApp({
                 }
                 else if (node.type === 'End') {
                      if(!isConnected(node.id, 'in')) errs.push("End node unreachable.");
+                }
+                else if (['And','NAnd','Or','NOr','XOr'].includes(node.type)) {
+                    // Logic Nodes validation
+                    // Maybe warn if inputs disconnected? For now, we leave flexible.
                 }
 
                 setError(node.id, errs);
@@ -1223,7 +1357,12 @@ const app = createApp({
         const addFolder = (parentId) => { project.folders.push({ id: getUniqueId(), name: 'New Folder', parentId }); ui.contextMenu.visible = false; };
         const addDialog = (folderId) => {
             const id = getUniqueId();
-            project.dialogs.push({ id, folderId, name: 'Dialog ' + id, nodes: [{ id: getUniqueId(), type: 'Start', x: 50, y: 50, data: {} }, { id: getUniqueId(), type: 'End', x: 400, y: 50, data: { nextDialogId: null } }], connections: [] });
+            project.dialogs.push({ 
+                id, folderId, name: 'Dialog ' + id, 
+                variables: [], 
+                nodes: [{ id: getUniqueId(), type: 'Start', x: 50, y: 50, data: {} }, { id: getUniqueId(), type: 'End', x: 400, y: 50, data: { nextDialogId: null } }], 
+                connections: [] 
+            });
             selectDialog(id); ui.contextMenu.visible = false;
         };
         const renameTreeItem = (item) => {
@@ -1582,6 +1721,8 @@ const app = createApp({
             e.preventDefault();
             if (isConnecting.value) { isConnecting.value = false; return; }
             ui.contextMenu = { visible: true, x: e.clientX, y: e.clientY, type: 'canvas', item: null };
+            ui.searchQuery = '';
+            nextTick(() => { if(ctxSearch.value) ctxSearch.value.focus(); });
         };
 
         const fitView = () => {
@@ -1617,6 +1758,9 @@ const app = createApp({
             } else if (type === 'SetVar') node.data = { variableId: null, operation: '=', value: '' };
             else if (type === 'GetVar') node.data = { variableId: null };
             else if (type === 'Compare') node.data = { variableId: null, operator: '==', compareValue: '' };
+            else if (['And','NAnd','Or','NOr','XOr'].includes(type)) {
+                node.data = { inputCount: 2 };
+            }
             else if (type === 'Start') node.data = {};
             else if (type === 'End') node.data = { nextDialogId: null };
 
@@ -1676,6 +1820,15 @@ const app = createApp({
             const wPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
             mousePos.x = wPos.x; mousePos.y = wPos.y;
         };
+        
+        const isValidBoolSource = (node) => {
+            if(['And','NAnd','Or','NOr','XOr','Compare'].includes(node.type)) return true;
+            if(node.type === 'GetVar' || node.type === 'SetVar') {
+                return getVarType(node.data.variableId) === 'bool';
+            }
+            return false;
+        };
+
         const finishConnect = (nodeId, socket, type) => {
             if (!isConnecting.value) return;
             if (connStart.nodeId === nodeId && connStart.socket === socket) { isConnecting.value = false; return; }
@@ -1688,6 +1841,34 @@ const app = createApp({
                 if (!socket.includes('in') && socket !== 'in_val') { isConnecting.value = false; return; }
                 fromNode = connStart.nodeId; fromSocket = connStart.socket; toNode = nodeId; toSocket = socket;
             }
+
+            // --- STRICT VALIDATION FOR BOOLEAN INPUTS ---
+            const targetSocket = connStart.isInput ? connStart.socket : socket;
+            const targetNodeId = connStart.isInput ? connStart.nodeId : nodeId;
+            const sourceNodeId = connStart.isInput ? nodeId : connStart.nodeId;
+            
+            const targetNode = activeNodes.value.find(n => n.id === targetNodeId);
+            const sourceNode = activeNodes.value.find(n => n.id === sourceNodeId);
+
+            // 1. Answer Conditions
+            if(targetSocket.startsWith('in_ans_cond_')) {
+                if(!isValidBoolSource(sourceNode)) {
+                    addToast("Conditions only accept Boolean variables or Logic Gates.", "error");
+                    isConnecting.value = false;
+                    return;
+                }
+            }
+            
+            // 2. Logic Gate Inputs
+            if(['And','NAnd','Or','NOr','XOr'].includes(targetNode.type)) {
+                if(!isValidBoolSource(sourceNode)) {
+                    addToast("Logic Gates only accept Boolean variables or other Gates.", "error");
+                    isConnecting.value = false;
+                    return;
+                }
+            }
+            // ---------------------------------------
+
             const newConn = { id: getUniqueId(), fromNode, fromSocket, toNode, toSocket };
             if (!activeConnections.value.find(c => c.fromNode === newConn.fromNode && c.fromSocket === newConn.fromSocket && c.toNode === newConn.toNode && c.toSocket === newConn.toSocket)) {
                 activeConnections.value.push(newConn);
@@ -1696,7 +1877,15 @@ const app = createApp({
             markActiveDirty();
             nextTick(() => updateTick.value++);
         };
-        const canDrop = (dir, type) => isConnecting.value && connStart.type === type && ((!connStart.isInput && dir === 'in') || (connStart.isInput && dir === 'out'));
+        const canDrop = (dir, type) => {
+            if (!isConnecting.value || connStart.type !== type) return false;
+            // Logic for dropping onto "in" sockets
+            if ((!connStart.isInput && dir === 'in') || (connStart.isInput && dir === 'out')) {
+                return true; 
+            }
+            return false;
+        };
+
         const getPath = (conn) => {
             const start = getSocketPos(conn.fromNode, conn.fromSocket);
             const end = getSocketPos(conn.toNode, conn.toSocket);
@@ -1820,16 +2009,28 @@ const app = createApp({
         const removeAnswer = (node, idx) => {
             // FIX 2a: Remove connection for this answer
             const sockToRemove = 'out_ans_' + idx;
+            const condSockToRemove = 'in_ans_cond_' + idx;
+            
+            // Remove outgoing flows AND incoming conditions
             activeDialog.value.connections = activeDialog.value.connections.filter(c => 
-                !(c.fromNode === node.id && c.fromSocket === sockToRemove)
+                !((c.fromNode === node.id && c.fromSocket === sockToRemove) || 
+                  (c.toNode === node.id && c.toSocket === condSockToRemove))
             );
 
             // FIX 2b: Shift connections for subsequent answers
             activeDialog.value.connections.forEach(c => {
+                // Shift Outputs
                 if(c.fromNode === node.id && c.fromSocket.startsWith('out_ans_')) {
                     const cIdx = parseInt(c.fromSocket.replace('out_ans_', ''));
                     if(cIdx > idx) {
                         c.fromSocket = 'out_ans_' + (cIdx - 1);
+                    }
+                }
+                // Shift Inputs (Conditions)
+                if(c.toNode === node.id && c.toSocket.startsWith('in_ans_cond_')) {
+                    const cIdx = parseInt(c.toSocket.replace('in_ans_cond_', ''));
+                    if(cIdx > idx) {
+                        c.toSocket = 'in_ans_cond_' + (cIdx - 1);
                     }
                 }
             });
@@ -1841,6 +2042,7 @@ const app = createApp({
         const getNodeColor = (t) => {
             if(t==='Start') return '#569cd6'; if(t==='End') return '#d16969'; if(t==='Text') return '#ce9178';
             if(t==='SetVar') return '#c586c0'; if(t==='GetVar') return '#4ec9b0'; if(t==='Compare') return '#dcdcaa';
+            if(['And','NAnd','Or','NOr','XOr'].includes(t)) return '#4FC1FF';
             return '#888';
         };
 
@@ -1856,9 +2058,16 @@ const app = createApp({
         const getNodeIcon = (t) => {
             if(t==='Start') return 'play_arrow'; if(t==='End') return 'stop'; if(t==='Text') return 'chat_bubble';
             if(t==='SetVar') return 'edit'; if(t==='GetVar') return 'data_object'; if(t==='Compare') return 'balance';
+            if(['And','NAnd','Or','NOr','XOr'].includes(t)) return 'hub';
             return '';
         };
+        
         const getVarType = (id) => {
+            // Check current dialog (local)
+            if (activeDialog.value && activeDialog.value.variables) {
+                const v = activeDialog.value.variables.find(v => v.id === id);
+                if(v) return v.type;
+            }
             // Check global
             let v = project.variables.find(v => v.id === id);
             if(v) return v.type;
@@ -1893,6 +2102,64 @@ const app = createApp({
             return 'string';
         };
 
+        const addDialogVariable = () => {
+            if (!activeDialog.value) return;
+            if (!activeDialog.value.variables) activeDialog.value.variables = [];
+            activeDialog.value.variables.push({ id: getUniqueId(), name: 'local_var', type: 'bool', value: 'false', resetOnStart: true });
+            markActiveDirty();
+        };
+
+        const deleteDialogVariable = (id) => {
+            if (!activeDialog.value) return;
+            showConfirm("Delete Local Variable?", "References inside this dialog will break.", () => {
+                const idx = activeDialog.value.variables.findIndex(v => v.id === id);
+                if (idx > -1) {
+                    activeDialog.value.variables.splice(idx, 1);
+                    markActiveDirty();
+                    setError(id, []);
+                }
+            });
+        };
+
+        const addLogicInput = (node) => { node.data.inputCount++; markActiveDirty(); nextTick(() => updateTick.value++); };
+        const remLogicInput = (node) => { 
+            if(node.data.inputCount > 2) { 
+                // Remove connections to the deleted socket
+                const sockName = 'in_' + (node.data.inputCount - 1);
+                activeConnections.value = activeConnections.value.filter(c => !(c.toNode === node.id && c.toSocket === sockName));
+                node.data.inputCount--; 
+                markActiveDirty(); 
+                nextTick(() => updateTick.value++); 
+            } 
+        };
+
+        // Context Menu Search
+        const menuItems = [
+            { type: 'Text', label: 'Text Node', icon: 'chat_bubble', group: 'Dialogue' },
+            { type: 'Start', label: 'Start', icon: 'play_arrow', group: 'Flow' },
+            { type: 'End', label: 'End / Switch', icon: 'stop', group: 'Flow' },
+            { type: 'Compare', label: 'Compare', icon: 'balance', group: 'Logic' },
+            { type: 'And', label: 'AND Gate', icon: 'hub', group: 'Logic' },
+            { type: 'Or', label: 'OR Gate', icon: 'hub', group: 'Logic' },
+            { type: 'XOr', label: 'XOR Gate', icon: 'hub', group: 'Logic' },
+            { type: 'NAnd', label: 'NAND Gate', icon: 'hub', group: 'Logic' },
+            { type: 'NOr', label: 'NOR Gate', icon: 'hub', group: 'Logic' },
+            { type: 'SetVar', label: 'Set Variable', icon: 'edit', group: 'Variables' },
+            { type: 'GetVar', label: 'Get Variable', icon: 'data_object', group: 'Variables' },
+        ];
+
+        const filteredMenuItems = computed(() => {
+            const q = ui.searchQuery.toLowerCase();
+            const groups = {};
+            menuItems.forEach(item => {
+                if(item.label.toLowerCase().includes(q)) {
+                    if(!groups[item.group]) groups[item.group] = { label: item.group, items: [] };
+                    groups[item.group].items.push(item);
+                }
+            });
+            return groups;
+        });
+
         const getProjectJson = () => {
             // Save UI state to project
             project.uiState = {
@@ -1900,7 +2167,8 @@ const app = createApp({
                 snap: editor.snap,
                 sections: ui.sections,
                 expandedFolders: Array.from(expandedFolderIds),
-                collapsedCharacters: Array.from(collapsedCharacterIds)
+                collapsedCharacters: Array.from(collapsedCharacterIds),
+                overlayCollapsed: ui.overlayCollapsed // Save overlay state
             };
             return JSON.stringify(project, null, 2);
         };
@@ -1915,9 +2183,16 @@ const app = createApp({
             };
 
             // Helper to resolve var ID to name/scope
-            const resolveVar = (varId) => {
+            const resolveVar = (varId, currentDialog) => {
+                // Check Local
+                if (currentDialog && currentDialog.variables) {
+                    const l = currentDialog.variables.find(v => v.id === varId);
+                    if(l) return { name: l.name, scope: 'local', type: l.type };
+                }
+                // Check Global
                 const g = project.variables.find(v => v.id === varId);
                 if(g) return { name: g.name, scope: 'global', type: g.type };
+                // Check Character
                 for(const c of project.characters) {
                     if(c.variables) {
                         const cv = c.variables.find(v => v.id === varId);
@@ -1940,6 +2215,25 @@ const app = createApp({
 
             // 3. Dialogs (Flattens folders, removes visual data, inlines translations)
             project.dialogs.forEach(d => {
+                const dialogExport = {
+                    id: d.id,
+                    name: d.name,
+                    variables: {}, // Export local vars definition
+                    nodes: [],
+                    connections: []
+                };
+
+                // Add Dialog Variables to Export
+                if (d.variables) {
+                    d.variables.forEach(v => {
+                        dialogExport.variables[v.name] = { 
+                            type: v.type, 
+                            value: v.value,
+                            resetOnStart: (v.resetOnStart !== undefined) ? v.resetOnStart : true 
+                        };
+                    });
+                }
+
                 const cleanNodes = d.nodes
                     .filter(n => n.type !== 'Group') // Ignore Groups in Runtime
                     .map(n => {
@@ -1965,6 +2259,14 @@ const app = createApp({
                              project.settings.languages.forEach(lang => {
                                  choiceObj.translations[lang] = a.translations[lang] || '';
                              });
+
+                             // Export Condition Logic (Reference to Node ID)
+                             const condSocket = 'in_ans_cond_' + idx;
+                             const condConn = d.connections.find(c => c.toNode === n.id && c.toSocket === condSocket);
+                             if (condConn) {
+                                 choiceObj.conditionNodeId = condConn.fromNode; // The engine should eval this node
+                             }
+
                              return choiceObj;
                         });
                     }
@@ -1974,21 +2276,34 @@ const app = createApp({
                          if (conn) {
                              const source = d.nodes.find(sn => sn.id === conn.fromNode);
                              if (source && (source.type === 'GetVar' || source.type === 'SetVar')) {
-                                  const varInfo = resolveVar(source.data.variableId);
+                                  const varInfo = resolveVar(source.data.variableId, d);
                                   if (varInfo) clean.variable = varInfo;
                              }
                          }
                          clean.operator = n.data.operator;
                          clean.value = n.data.compareValue;
                     }
+                    else if (['And','NAnd','Or','NOr','XOr'].includes(n.type)) {
+                        // Export Logic Gate Inputs as array of Source Node IDs
+                        clean.inputs = [];
+                        for(let i=0; i<n.data.inputCount; i++) {
+                            const socket = 'in_' + i;
+                            const conn = d.connections.find(c => c.toNode === n.id && c.toSocket === socket);
+                            if(conn) {
+                                clean.inputs.push(conn.fromNode); // Store Source Node ID
+                            } else {
+                                clean.inputs.push(null); // Unconnected input
+                            }
+                        }
+                    }
                     else if (n.type === 'SetVar') {
-                         const varInfo = resolveVar(n.data.variableId);
+                         const varInfo = resolveVar(n.data.variableId, d);
                          if (varInfo) clean.variable = varInfo;
                          clean.operation = n.data.operation;
                          clean.value = n.data.value;
                     }
                     else if (n.type === 'GetVar') {
-                         const varInfo = resolveVar(n.data.variableId);
+                         const varInfo = resolveVar(n.data.variableId, d);
                          if (varInfo) clean.variable = varInfo;
                     }
                     else if (n.type === 'End') {
@@ -1998,8 +2313,10 @@ const app = createApp({
                     return clean;
                 });
 
+                dialogExport.nodes = cleanNodes;
+
                 // Connections: Remove visual styling, keep topology AND ID
-                const cleanConnections = d.connections.map(c => ({
+                dialogExport.connections = d.connections.map(c => ({
                     id: c.id, // Explicit ID for runtime traversal
                     from: c.fromNode, 
                     fromSocket: c.fromSocket,
@@ -2008,12 +2325,7 @@ const app = createApp({
                 }));
 
                 // Push object with ID included
-                runtime.dialogs.push({
-                    id: d.id,
-                    name: d.name,
-                    nodes: cleanNodes,
-                    connections: cleanConnections
-                });
+                runtime.dialogs.push(dialogExport);
             });
 
             return JSON.stringify(runtime, null, 2);
@@ -2273,6 +2585,13 @@ const app = createApp({
                     }
                     d.dialogs.forEach(dialog => {
                         if (dialog.folderId === undefined) dialog.folderId = null;
+                        if (!dialog.variables) dialog.variables = []; // Init variables
+                        
+                        // Default resetOnStart for imported files
+                        dialog.variables.forEach(v => {
+                            if (v.resetOnStart === undefined) v.resetOnStart = true;
+                        });
+
                         dialog.nodes.forEach(n => {
                             // Recover/Validate Data Structures
                             if(n.type === 'Text') {
@@ -2295,6 +2614,10 @@ const app = createApp({
                             if(n.type === 'Compare' && !n.data.compType) {
                                 n.data.compType = 'string';
                             }
+                            // Logic Nodes
+                            if(['And','NAnd','Or','NOr','XOr'].includes(n.type)) {
+                                if(!n.data.inputCount) n.data.inputCount = 2;
+                            }
                         });
                     });
                     
@@ -2305,6 +2628,7 @@ const app = createApp({
                         if(project.uiState.gridSize) editor.gridSize = project.uiState.gridSize;
                         if(project.uiState.snap !== undefined) editor.snap = project.uiState.snap;
                         if(project.uiState.sections) Object.assign(ui.sections, project.uiState.sections);
+                        if(project.uiState.overlayCollapsed !== undefined) ui.overlayCollapsed = project.uiState.overlayCollapsed;
                         if(project.uiState.expandedFolders) {
                             expandedFolderIds.clear();
                             project.uiState.expandedFolders.forEach(id => expandedFolderIds.add(id));
@@ -2330,7 +2654,7 @@ const app = createApp({
         };
 
         return {
-            project, activeDialogId, ui, canvasRef, pan, zoom, activeNodes, activeConnections,
+            project, activeDialogId, activeDialog, ui, canvasRef, pan, zoom, activeNodes, activeConnections,
             showExport, importData, newLang, editor, loc,
             dragLinePath, selectedNodeId, selectedConnectionId, selectedNodeIds, hoverGroupId, removeGroupId,
             handleMove, handleUp, startPan, handleZoom, startNodeDrag, onNodeMouseDown, onCanvasMouseDown,
@@ -2348,7 +2672,9 @@ const app = createApp({
             selectionRect, isSelecting,
             validationErrors, validateVars, validateChars, markActiveDirty,
             collapsedCharacterIds, toggleChar, // New sidebar state
-            toastSystem, addToast, removeToast, getToastIcon, needsExpand
+            toastSystem, addToast, removeToast, getToastIcon, needsExpand,
+            addDialogVariable, deleteDialogVariable,
+            addLogicInput, remLogicInput, filteredMenuItems, ctxSearch
         };
     }
 }).mount('#app');
