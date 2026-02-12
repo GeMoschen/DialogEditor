@@ -136,7 +136,7 @@
         
         /* Dialog Vars Overlay */
         .dialog-vars-overlay {
-            position: absolute; top: 10px; right: 10px;
+            position: absolute; top: 10px; left: 10px;
             width: 280px; background: var(--bg-panel); 
             border: 1px solid var(--border); border-radius: 4px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 5;
@@ -707,7 +707,7 @@
                         <select v-model="node.data.variableId" class="text-sm" @change="onSetVarChange(node); markActiveDirty()" :class="{error: !node.data.variableId}">
                             <option :value="null">Select Var...</option>
                             <optgroup label="Dialog (Local)" v-if="activeDialog">
-                                <option v-for="v in activeDialog.variables" :value="v.id">{{ v.name }}</option>
+                                <option v-for="v in activeDialog.variables" :value="v.id"># - {{ v.name }}</option>
                             </optgroup>
                             <optgroup label="Global"><option v-for="v in project.variables" :value="v.id">{{ v.name }}</option></optgroup>
                             <optgroup v-for="c in project.characters" :label="c.name"><option v-for="v in c.variables" :value="v.id">{{ c.name + "." + v.name }}</option></optgroup>
@@ -735,7 +735,7 @@
                          <select v-model="node.data.variableId" class="text-sm" :class="{error: !node.data.variableId}" @change="markActiveDirty">
                             <option :value="null">Select Var...</option>
                             <optgroup label="Dialog (Local)" v-if="activeDialog">
-                                <option v-for="v in activeDialog.variables" :value="v.id">{{ v.name }}</option>
+                                <option v-for="v in activeDialog.variables" :value="v.id"># - {{ v.name }}</option>
                             </optgroup>
                             <optgroup label="Global"><option v-for="v in project.variables" :value="v.id">{{ v.name }}</option></optgroup>
                             <optgroup v-for="c in project.characters" :label="c.name"><option v-for="v in c.variables" :value="v.id">{{ c.name + "." + v.name }}</option></optgroup>
