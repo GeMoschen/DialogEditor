@@ -61,7 +61,7 @@ The editor features a comprehensive set of nodes to handle flow and data:
 
 ## 🚀 Getting Started
 
-1.  Download the `DialogEditor.html` file from this repository.
+1.  Download the `DialogEditor.html` file from this repository or [CLICK HERE](https://gemoschen.github.io/DialogEditor/DialogEditor.html).
 2.  Open the file in Chrome, Firefox, or Edge.
 3.  Start creating!
 
