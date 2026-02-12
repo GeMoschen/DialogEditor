@@ -63,6 +63,7 @@
             display: inline-flex; align-items: center; justify-content: center;
         }
         button:hover { background: var(--border); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
         button.primary { background: var(--accent); color: white; border: none; }
         button.full-width { width: 100%; text-align: center; margin-bottom: 5px; padding: 8px; }
         button.small { padding: 2px 6px; font-size: 10px; height: 20px; }
@@ -97,19 +98,25 @@
         /* Layout */
         #app { display: flex; width: 100%; height: 100%; }
         
-        /* Sidebar */
+        /* Sidebar (Fixed Scrolling) */
         .sidebar { 
             width: 300px; background: var(--bg-panel); border-right: 1px solid var(--border); 
             display: flex; flex-direction: column; z-index: 10; flex-shrink: 0; 
-            height: 100vh;
+            height: 100vh; overflow: hidden; /* Fix 1: Stop main sidebar from scrolling */
         }
         .sidebar-header { padding: 10px; background: var(--bg-header); font-weight: 600; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-        .sidebar-content { overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; }
         
-        .section { border-bottom: 1px solid var(--border); display: flex; flex-direction: column; }
+        /* Fix 2: sidebar-content uses flex column and hidden overflow to let children scroll */
+        .sidebar-content { 
+            flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0; 
+        }
+        
+        .section { border-bottom: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
         .section-header { padding: 8px 12px; cursor: pointer; background: var(--bg-panel); display: flex; align-items: center; font-size: 13px; font-weight: 600; flex-shrink: 0; }
         .section-header:hover { background: #2a2d2e; }
-        .section.grow { flex-grow: 1; min-height: 0; } 
+        
+        /* Fix 3: The growing section (Dialogs) handles its own scrolling */
+        .section.grow { flex-grow: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; } 
         .section-body { padding: 8px; background: #1e1e1e; }
         .section.grow .section-body { flex-grow: 1; overflow-y: auto; }
 
@@ -134,6 +141,14 @@
         }
         .graph-layer { position: absolute; top: 0; left: 0; transform-origin: 0 0; width: 0; height: 0; }
         
+        /* Overlay Toolbar */
+        .overlay-toolbar {
+            position: absolute; bottom: 20px; left: 20px;
+            background: var(--bg-panel); border: 1px solid var(--border);
+            border-radius: 4px; display: flex; gap: 5px; padding: 5px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 20;
+        }
+
         /* Dialog Vars Overlay */
         .dialog-vars-overlay {
             position: absolute; top: 10px; left: 10px;
@@ -381,10 +396,6 @@
     <div class="sidebar" @mousedown.stop>
         <div class="sidebar-header">
             <span>Dialog Editor</span>
-            <div class="flex gap-sm">
-                <button class="icon-btn" title="Reset View" @click="fitView"><span class="icon">center_focus_strong</span></button>
-                <button class="icon-btn" title="Export/Import" @click="showExport = true"><span class="icon">save</span></button>
-            </div>
         </div>
 
         <div class="sidebar-content">
@@ -425,7 +436,7 @@
                     <div v-for="v in project.variables" :key="v.id" class="list-item" style="display:block; cursor:default;" @input="validateVars">
                         <div class="flex gap-sm center">
                             <span v-if="validationErrors[v.id]" class="icon warning-icon" style="font-size:14px" :title="validationErrors[v.id].join('\n')">warning</span>
-                            <input v-model="v.name" class="text-sm grow" :class="{error: validationErrors[v.id]}" @change="validateVars">
+                            <input :value="v.name" @focus="saveSnapshot(v, 'name')" @change="e => commitProp(v, 'name', e.target.value)" class="text-sm grow" :class="{error: validationErrors[v.id]}" @input="validateVars">
                             <button class="icon-btn" title="Delete Variable" @click="deleteVariable(v.id)"><span class="icon">delete</span></button>
                         </div>
                         <div class="flex gap-sm mt-2 center">
@@ -444,7 +455,7 @@
                                 </div>
                             </template>
                             <template v-else>
-                                <input v-model="v.value" class="text-sm grow" placeholder="Default">
+                                <input :value="v.value" @focus="saveSnapshot(v, 'value')" @change="e => commitProp(v, 'value', e.target.value)" class="text-sm grow" placeholder="Default">
                             </template>
                         </div>
                     </div>
@@ -467,21 +478,21 @@
                             <span class="icon" style="font-size:16px; color:#888; width:16px">{{ collapsedCharacterIds.has(c.id) ? 'chevron_right' : 'expand_more' }}</span>
                             <span v-if="validationErrors[c.id]" class="icon warning-icon" style="font-size:14px" :title="validationErrors[c.id].join('\n')">warning</span>
                             <input type="color" v-model="c.color" style="width:24px; height:24px; padding:0; border:none; background:none; cursor: pointer;" @click.stop>
-                            <input v-model="c.name" class="text-sm grow" :class="{error: validationErrors[c.id]}" @change="validateChars" @click.stop style="font-weight:600">
+                            <input :value="c.name" @focus="saveSnapshot(c, 'name')" @change="e => { commitProp(c, 'name', e.target.value); validateChars(); }" class="text-sm grow" :class="{error: validationErrors[c.id]}" @click.stop style="font-weight:600">
                             <button class="icon-btn" @click.stop="addCharacterVariable(c.id)" title="Add Character Variable"><span class="icon">playlist_add</span></button>
                             <button class="icon-btn" @click.stop="deleteCharacter(c.id)" title="Delete Character"><span class="icon">delete</span></button>
                         </div>
                         
                         <div v-if="!collapsedCharacterIds.has(c.id)" style="padding-left: 24px;">
                             <div class="mt-2 mb-2">
-                                <textarea v-model="c.description" class="text-sm" rows="2" placeholder="Description / Context (for translators & audio)" style="color:#aaa; font-size:11px; background: #222;"></textarea>
+                                <textarea :value="c.description" @focus="saveSnapshot(c, 'description')" @change="e => commitProp(c, 'description', e.target.value)" class="text-sm" rows="2" placeholder="Description / Context (for translators & audio)" style="color:#aaa; font-size:11px; background: #222;"></textarea>
                             </div>
 
                             <div v-if="c.variables && c.variables.length > 0" class="mt-1" style="border-left: 1px solid #444; padding-left: 8px;">
                                 <div v-for="cv in c.variables" :key="cv.id" class="flex col mb-1">
                                      <div class="flex gap-sm center">
                                         <span v-if="validationErrors[cv.id]" class="icon warning-icon" style="font-size:12px" :title="validationErrors[cv.id].join('\n')">warning</span>
-                                        <input v-model="cv.name" class="text-sm grow" placeholder="Var Name" :class="{error: validationErrors[cv.id]}" @change="validateChars" style="background:#222">
+                                        <input :value="cv.name" @focus="saveSnapshot(cv, 'name')" @change="e => { commitProp(cv, 'name', e.target.value); validateChars(); }" class="text-sm grow" placeholder="Var Name" :class="{error: validationErrors[cv.id]}" style="background:#222">
                                         <button class="icon-btn" @click="deleteCharacterVariable(c.id, cv.id)" title="Delete Variable"><span class="icon">close</span></button>
                                      </div>
                                      <div class="flex gap-sm mt-1 center">
@@ -500,7 +511,7 @@
                                             </div>
                                         </template>
                                         <template v-else>
-                                            <input v-model="cv.value" class="text-sm grow" placeholder="Def" style="background:#222">
+                                            <input :value="cv.value" @focus="saveSnapshot(cv, 'value')" @change="e => commitProp(cv, 'value', e.target.value)" class="text-sm grow" placeholder="Def" style="background:#222">
                                         </template>
                                      </div>
                                 </div>
@@ -535,6 +546,15 @@
          @wheel.prevent="handleZoom">
         
         <div class="grid-layer" :style="{ backgroundPosition: `${pan.x}px ${pan.y}px`, backgroundSize: `${editor.gridSize * zoom}px ${editor.gridSize * zoom}px` }"></div>
+
+        <div class="overlay-toolbar">
+             <button class="icon-btn" title="Export/Import" @click="showExport = true"><span class="icon">save</span></button>
+             <div style="width:1px; background:var(--border); margin:0 4px;"></div>
+             <button class="icon-btn" title="Reset View" @click="fitView"><span class="icon">center_focus_strong</span></button>
+             <div style="width:1px; background:var(--border); margin:0 4px;"></div>
+			 <button class="icon-btn" title="Undo (Ctrl+Z)" @click="history.undo()" :disabled="history.past.length === 0"><span class="icon">undo</span></button>
+             <button class="icon-btn" title="Redo (Ctrl+Y)" @click="history.redo()" :disabled="history.future.length === 0"><span class="icon">redo</span></button>
+        </div>
         
         <div class="dialog-vars-overlay" @mousedown.stop @wheel.stop>
             <div class="dialog-vars-header" @click="ui.overlayCollapsed = !ui.overlayCollapsed">
@@ -551,7 +571,7 @@
                 <div v-if="activeDialog" v-for="v in activeDialog.variables" :key="v.id" class="list-item" style="display:block; cursor:default; background: #222; margin-bottom:5px; border:1px solid #333">
                     <div class="flex gap-sm center">
                         <span v-if="validationErrors[v.id]" class="icon warning-icon" style="font-size:12px" :title="validationErrors[v.id].join('\n')">warning</span>
-                        <input v-model="v.name" class="text-sm grow" :class="{error: validationErrors[v.id]}" placeholder="Name" @change="markActiveDirty">
+                        <input :value="v.name" @focus="saveSnapshot(v, 'name')" @change="e => { commitProp(v, 'name', e.target.value); markActiveDirty(); }" class="text-sm grow" :class="{error: validationErrors[v.id]}" placeholder="Name">
                         <button class="icon-btn" title="Delete" @click="deleteDialogVariable(v.id)"><span class="icon">close</span></button>
                     </div>
                     <div class="flex gap-sm mt-1 center">
@@ -564,7 +584,7 @@
                         
                         <div class="flex center" title="Reset on Dialog Start?">
                             <input type="checkbox" :id="'dvr-'+v.id" v-model="v.resetOnStart" @change="markActiveDirty">
-                            <label :for="'dvr-'+v.id" class="text-sm text-muted ml-1" style="font-size:10px; cursor:pointer">Rst</label>
+                            <label :for="'dvr-'+v.id" class="text-sm text-muted ml-1" style="font-size:10px; cursor:pointer">Reset</label>
                         </div>
 
                         <template v-if="v.type === 'bool'">
@@ -575,7 +595,7 @@
                             </div>
                         </template>
                         <template v-else>
-                            <input v-model="v.value" class="text-sm grow" placeholder="Def">
+                            <input :value="v.value" @focus="saveSnapshot(v, 'value')" @change="e => commitProp(v, 'value', e.target.value)" class="text-sm grow" placeholder="Def">
                         </template>
                     </div>
                 </div>
@@ -615,7 +635,7 @@
                  @input="markActiveDirty">
                 
                 <div v-if="node.type === 'Group'" class="node-header" @mousedown.left.stop="startNodeDrag(node, $event)">
-                    <input v-model="node.data.label" class="text-group-header bold" @mousedown.stop @change="markActiveDirty">
+                    <input :value="node.data.label" @focus="saveSnapshot(node.data, 'label')" @change="e => commitProp(node.data, 'label', e.target.value)" class="text-group-header bold" @mousedown.stop @change="markActiveDirty">
                 </div>
                 
                 <div v-else class="node-header" 
@@ -652,12 +672,12 @@
                             <option v-for="c in project.characters" :value="c.id">{{ c.name }}</option>
                         </select>
                         <label class="text-sm text-muted">Key</label>
-                        <input v-model="node.data.key" class="text-sm mb-2" :class="{error: !node.data.key}" @change="markActiveDirty">
+                        <input :value="node.data.key" @focus="saveSnapshot(node.data, 'key')" @change="e => commitProp(node.data, 'key', e.target.value)" class="text-sm mb-2" :class="{error: !node.data.key}" @change="markActiveDirty">
                         
                         <label class="text-sm text-muted">Audio Note</label>
-                        <input v-model="node.data.note" class="text-sm mb-2" placeholder="(Optional context for voice actors)" @change="markActiveDirty">
+                        <input :value="node.data.note" @focus="saveSnapshot(node.data, 'note')" @change="e => commitProp(node.data, 'note', e.target.value)" class="text-sm mb-2" placeholder="(Optional context for voice actors)" @change="markActiveDirty">
 
-                        <textarea v-model="node.data.translations[project.settings.currentLang]" rows="2" placeholder="Dialogue text..." :class="{error: !node.data.translations[project.settings.currentLang]}" @change="markActiveDirty"></textarea>
+                        <textarea :value="node.data.translations[project.settings.currentLang]" @focus="saveSnapshot(node.data.translations, project.settings.currentLang)" @change="e => commitProp(node.data.translations, project.settings.currentLang, e.target.value)" rows="2" placeholder="Dialogue text..." :class="{error: !node.data.translations[project.settings.currentLang]}" @change="markActiveDirty"></textarea>
                         
                         <div class="flex center mt-2">
                              <span class="text-sm bold">Answers</span>
@@ -666,14 +686,14 @@
                         <div v-for="(ans, idx) in node.data.answers" :key="idx" class="mt-2" style="border-top:1px solid #333; padding-top:4px">
                              <div class="flex center gap-sm mb-1">
                                 <span class="text-sm text-muted" style="font-size:10px">Key:</span>
-                                <input v-model="ans.key" class="text-sm" style="font-size:10px; padding:1px; background:none; border:none; color:#888; width:100%" placeholder="Key" @change="markActiveDirty">
+                                <input :value="ans.key" @focus="saveSnapshot(ans, 'key')" @change="e => commitProp(ans, 'key', e.target.value)" class="text-sm" style="font-size:10px; padding:1px; background:none; border:none; color:#888; width:100%" placeholder="Key" @change="markActiveDirty">
                              </div>
                              <div class="flex center gap-sm">
                                  <div class="socket-hitbox" :id="'soc-' + node.id + '-in_ans_cond_' + idx" :class="{'can-drop': canDrop('in', 'data')}"
                                       @mousedown.stop="startConnect(node.id, 'in_ans_cond_' + idx, 'data', $event)" @mouseup.stop="finishConnect(node.id, 'in_ans_cond_' + idx, 'data')">
                                      <div class="socket data" title="Condition (Bool)"></div>
                                  </div>
-                                 <input v-model="ans.translations[project.settings.currentLang]" class="text-sm grow" placeholder="Answer..." :class="{error: !ans.translations[project.settings.currentLang]}" @change="markActiveDirty">
+                                 <input :value="ans.translations[project.settings.currentLang]" @focus="saveSnapshot(ans.translations, project.settings.currentLang)" @change="e => commitProp(ans.translations, project.settings.currentLang, e.target.value)" class="text-sm grow" placeholder="Answer..." :class="{error: !ans.translations[project.settings.currentLang]}" @change="markActiveDirty">
                                  <button class="icon-btn" title="Remove Answer" @click="removeAnswer(node, idx)"><span class="icon">remove</span></button>
                                  <div class="socket-hitbox" :id="'soc-' + node.id + '-out_ans_' + idx" :class="{'can-drop': canDrop('out', 'flow')}"
                                       @mousedown.stop="startConnect(node.id, 'out_ans_' + idx, 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'out_ans_' + idx, 'flow')">
@@ -682,7 +702,7 @@
                              </div>
                              <div class="flex center gap-sm mt-1">
                                  <span class="text-sm text-muted" style="font-size:10px; min-width:30px">Note:</span>
-                                 <input v-model="ans.note" class="text-sm grow" style="font-size:11px; color:#aaa; padding:2px; background:rgba(0,0,0,0.2)" placeholder="(Optional audio note)" @change="markActiveDirty">
+                                 <input :value="ans.note" @focus="saveSnapshot(ans, 'note')" @change="e => commitProp(ans, 'note', e.target.value)" class="text-sm grow" style="font-size:11px; color:#aaa; padding:2px; background:rgba(0,0,0,0.2)" placeholder="(Optional audio note)" @change="markActiveDirty">
                              </div>
                         </div>
                         <div v-if="node.data.answers.length === 0" class="socket-row right mt-2">
@@ -724,7 +744,7 @@
                                 </div>
                             </template>
                             <template v-else>
-                                <input v-model="node.data.value" class="text-sm grow" placeholder="Val" @change="markActiveDirty">
+                                <input :value="node.data.value" @focus="saveSnapshot(node.data, 'value')" @change="e => commitProp(node.data, 'value', e.target.value)" class="text-sm grow" placeholder="Val" @change="markActiveDirty">
                             </template>
                         </div>
                         <div class="socket-row right"><span class="text-sm mr-2">Out</span><div class="socket-hitbox" :id="'soc-' + node.id + '-out'" :class="{'can-drop': canDrop('out', 'flow')}" @mousedown.stop="startConnect(node.id, 'out', 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'out', 'flow')"><div class="socket flow"></div></div></div>
@@ -764,12 +784,12 @@
                              
                              <template v-else-if="['int','float'].includes(getConnectedType(node))">
                                 <select v-model="node.data.operator" class="text-sm" style="width:60px" @change="markActiveDirty"><option value="==">==</option><option value="!=">!=</option><option value=">">&gt;</option><option value="<">&lt;</option><option value=">=">&ge;</option><option value="<=">&le;</option></select>
-                                <input type="number" v-model="node.data.compareValue" class="text-sm grow" placeholder="0" @change="markActiveDirty">
+                                <input type="number" :value="node.data.compareValue" @focus="saveSnapshot(node.data, 'compareValue')" @change="e => commitProp(node.data, 'compareValue', e.target.value)" class="text-sm grow" placeholder="0" @change="markActiveDirty">
                              </template>
                              
                              <template v-else>
                                 <select v-model="node.data.operator" class="text-sm" style="width:80px" @change="markActiveDirty"><option value="==">==</option><option value="!=">!=</option><option value="contains">Contains</option></select>
-                                <input v-model="node.data.compareValue" class="text-sm grow" placeholder="Text" @change="markActiveDirty">
+                                <input :value="node.data.compareValue" @focus="saveSnapshot(node.data, 'compareValue')" @change="e => commitProp(node.data, 'compareValue', e.target.value)" class="text-sm grow" placeholder="Text" @change="markActiveDirty">
                              </template>
                         </div>
 
@@ -790,7 +810,7 @@
 
                     <div v-if="node.type === 'FireEvent'">
                         <div class="socket-row left"><div class="socket-hitbox" :id="'soc-' + node.id + '-in'" :class="{'can-drop': canDrop('in', 'flow')}" @mousedown.stop="startConnect(node.id, 'in', 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'in', 'flow')"><div class="socket flow"></div></div><span class="text-sm ml-2">In</span></div>
-                        <input v-model="node.data.eventName" class="text-sm mt-2 mb-2" placeholder="Event Name" @change="markActiveDirty">
+                        <input :value="node.data.eventName" @focus="saveSnapshot(node.data, 'eventName')" @change="e => commitProp(node.data, 'eventName', e.target.value)" class="text-sm mt-2 mb-2" placeholder="Event Name" @change="markActiveDirty">
                         
                         <div class="flex center gap-sm mb-2">
                             <span class="text-sm text-muted">Args: {{ node.data.inputCount }}</span>
@@ -907,6 +927,141 @@
 <script>
 const { createApp, ref, reactive, computed, onMounted, nextTick, inject, provide, watch } = Vue;
 
+// --- COMMAND PATTERN INFRASTRUCTURE ---
+class Command {
+    execute() {}
+    undo() {}
+}
+
+class CmdMoveNodes extends Command {
+    constructor(nodeIdMap, nodesArray) {
+        super();
+        this.nodeIdMap = JSON.parse(JSON.stringify(nodeIdMap)); // Deep copy { id: {x,y, oldX, oldY} }
+        this.nodesArray = nodesArray; // Reference to live array
+    }
+    execute() {
+        for(const id in this.nodeIdMap) {
+            const n = this.nodesArray.find(x => x.id == id);
+            if(n) { n.x = this.nodeIdMap[id].x; n.y = this.nodeIdMap[id].y; }
+        }
+    }
+    undo() {
+        for(const id in this.nodeIdMap) {
+            const n = this.nodesArray.find(x => x.id == id);
+            if(n) { n.x = this.nodeIdMap[id].oldX; n.y = this.nodeIdMap[id].oldY; }
+        }
+    }
+}
+
+class CmdAddNode extends Command {
+    constructor(nodeList, node) {
+        super();
+        this.nodeList = nodeList;
+        this.node = node;
+    }
+    execute() { this.nodeList.push(this.node); }
+    undo() { 
+        const idx = this.nodeList.findIndex(n => n.id === this.node.id);
+        if(idx > -1) this.nodeList.splice(idx, 1);
+    }
+}
+
+class CmdDeleteNode extends Command {
+    constructor(nodeList, connList, nodeId) {
+        super();
+        this.nodeList = nodeList;
+        this.connList = connList;
+        this.nodeId = nodeId;
+        this.node = null;
+        this.connections = [];
+    }
+    execute() {
+        this.node = this.nodeList.find(n => n.id === this.nodeId);
+        if(!this.node) return;
+        // Find connections to remove
+        this.connections = this.connList.filter(c => c.fromNode === this.nodeId || c.toNode === this.nodeId);
+        
+        // Remove
+        const nIdx = this.nodeList.indexOf(this.node);
+        if(nIdx > -1) this.nodeList.splice(nIdx, 1);
+        
+        this.connections.forEach(c => {
+            const cIdx = this.connList.indexOf(c);
+            if(cIdx > -1) this.connList.splice(cIdx, 1);
+        });
+    }
+    undo() {
+        if(this.node) this.nodeList.push(this.node);
+        this.connections.forEach(c => this.connList.push(c));
+    }
+}
+
+class CmdAddConnection extends Command {
+    constructor(connList, connection) {
+        super();
+        this.connList = connList;
+        this.connection = connection;
+    }
+    execute() { this.connList.push(this.connection); }
+    undo() {
+        const idx = this.connList.findIndex(c => c.id === this.connection.id);
+        if(idx > -1) this.connList.splice(idx, 1);
+    }
+}
+
+class CmdDeleteConnection extends Command {
+    constructor(connList, connectionId) {
+        super();
+        this.connList = connList;
+        this.connId = connectionId;
+        this.connection = null;
+    }
+    execute() {
+        this.connection = this.connList.find(c => c.id === this.connId);
+        if(this.connection) {
+            const idx = this.connList.indexOf(this.connection);
+            this.connList.splice(idx, 1);
+        }
+    }
+    undo() {
+        if(this.connection) this.connList.push(this.connection);
+    }
+}
+
+class CmdPropChange extends Command {
+    constructor(targetObj, key, oldVal, newVal) {
+        super();
+        this.obj = targetObj;
+        this.key = key;
+        this.oldVal = oldVal;
+        this.newVal = newVal;
+    }
+    execute() { this.obj[this.key] = this.newVal; }
+    undo() { this.obj[this.key] = this.oldVal; }
+}
+
+const history = reactive({
+    past: [],
+    future: [],
+    execute(cmd) {
+        cmd.execute();
+        this.past.push(cmd);
+        this.future = []; // Clear redo stack
+    },
+    undo() {
+        const cmd = this.past.pop();
+        if(!cmd) return;
+        cmd.undo();
+        this.future.push(cmd);
+    },
+    redo() {
+        const cmd = this.future.pop();
+        if(!cmd) return;
+        cmd.execute();
+        this.past.push(cmd);
+    }
+});
+
 // --- Tree Browser Component ---
 const TreeBrowser = {
     name: 'TreeBrowser',
@@ -921,7 +1076,7 @@ const TreeBrowser = {
         const openContextMenu = inject('openContextMenu');
         
         // GLOBAL STATE FOR EXPANSION
-        const expanded = inject('expandedFolderIds'); // NOW INJECTED
+        const expanded = inject('expandedFolderIds');
 
         const myFolders = computed(() => project.folders.filter(f => f.parentId === props.parentId));
         const myDialogs = computed(() => project.dialogs.filter(d => d.folderId === props.parentId));
@@ -984,6 +1139,22 @@ const app = createApp({
             searchQuery: ''
         });
         const ctxSearch = ref(null);
+        
+        // Property Snapshot Map for Inputs
+        const propSnapshots = new Map();
+        const saveSnapshot = (obj, key) => {
+            // Key using object ref + property name
+            propSnapshots.set(obj, { ...propSnapshots.get(obj), [key]: obj[key] });
+        };
+        const commitProp = (obj, key, newVal) => {
+            const snap = propSnapshots.get(obj);
+            const oldVal = (snap && snap[key] !== undefined) ? snap[key] : obj[key];
+            if(oldVal !== newVal) {
+                // We use command to apply the change (even though v-model already did it to UI, 
+                // re-applying ensures consistency and records history)
+                history.execute(new CmdPropChange(obj, key, oldVal, newVal));
+            }
+        };
 
         // GLOBAL UI STATE
         const expandedFolderIds = reactive(new Set());
@@ -1081,7 +1252,7 @@ const app = createApp({
         const selectionRect = reactive({ visible: false, x: 0, y: 0, w: 0, h: 0, startX: 0, startY: 0 });
         const isSelecting = ref(false);
         const initialSelectionSnapshot = new Set();
-        const boxSelectCache = []; // Cache node rects during selection
+        const boxSelectCache = []; 
 
         provide('project', project);
         provide('activeDialogId', activeDialogId);
@@ -1089,7 +1260,8 @@ const app = createApp({
         const selectDialog = (id) => {
             activeDialogId.value = id;
             selectedNodeIds.clear();
-            // Validate the newly opened dialog immediately
+            history.past = []; // Clear history on dialog switch
+            history.future = [];
             nextTick(() => { 
                 setTimeout(() => { 
                     updateTick.value++; 
@@ -1164,7 +1336,6 @@ const app = createApp({
                 varNames.add(v.name);
                 setError(v.id, errs);
             });
-            // If vars change, all dialogs might be invalid
             markAllDirty();
         };
 
@@ -1195,8 +1366,6 @@ const app = createApp({
 
         const validateDialog = (dialog) => {
             if (!dialog) return;
-            
-            // Validate Dialog Variables
             if(dialog.variables) {
                 const dVarNames = new Set();
                 dialog.variables.forEach(v => {
@@ -1207,23 +1376,19 @@ const app = createApp({
                     setError(v.id, vErrs);
                 });
             }
-
             const conns = dialog.connections;
             const isConnected = (nodeId, socket) => {
                 return conns.some(c => (c.fromNode === nodeId && c.fromSocket === socket) || (c.toNode === nodeId && c.toSocket === socket));
             };
-
             let dialogHasErrors = false;
             dialog.nodes.forEach(node => {
                 const errs = [];
-                
                 if(node.type === 'Text') {
                      if(!node.data.key) errs.push("Missing Localization Key.");
                      project.settings.languages.forEach(lang => {
                          if(!node.data.translations[lang]) errs.push(`Missing '${lang}' translation.`);
                      });
                      if(!isConnected(node.id, 'in')) errs.push("Flow Input disconnected.");
-                     
                      if(node.data.answers.length === 0) {
                          if(!isConnected(node.id, 'out')) errs.push("Flow Output disconnected.");
                      } else {
@@ -1255,20 +1420,14 @@ const app = createApp({
                 else if (node.type === 'End') {
                      if(!isConnected(node.id, 'in')) errs.push("End node unreachable.");
                 }
-                else if (['And','NAnd','Or','NOr','XOr'].includes(node.type)) {
-                    // Logic Nodes validation
-                    // Maybe warn if inputs disconnected? For now, we leave flexible.
-                }
                 else if (node.type === 'FireEvent') {
                     if(!node.data.eventName) errs.push("Missing Event Name.");
                     if(!isConnected(node.id, 'in')) errs.push("Input disconnected.");
                     if(!isConnected(node.id, 'out')) errs.push("Output disconnected.");
                 }
-
                 setError(node.id, errs);
                 if (errs.length > 0) dialogHasErrors = true;
             });
-            
             setError(dialog.id, dialogHasErrors ? ["Dialog contains errors."] : []);
         };
 
@@ -1282,7 +1441,6 @@ const app = createApp({
         const markActiveDirty = () => { if(activeDialogId.value) markDialogDirty(activeDialogId.value); };
         const markAllDirty = () => dirtyScopes.full = true;
 
-        // Validation Loop - Runs on updateTick but only checks dirty scopes
         watch(updateTick, () => {
             if (dirtyScopes.full) {
                 validateAll();
@@ -1299,18 +1457,12 @@ const app = createApp({
 
         provide('validationErrors', validationErrors);
 
-        // --- Logic ---
         let resizeObserver = null;
         onMounted(() => {
             if(canvasRef.value) canvasRef.value.addEventListener('contextmenu', onContextMenu);
             window.addEventListener('keydown', onKeyDown);
-            
-            // Initial Full Validation
             validateAll();
-
             setTimeout(() => { updateTick.value++; fitView(); }, 100);
-
-            // Toast timer
             setInterval(() => {
                 if (toastSystem.isPaused) return;
                 for (let i = toastSystem.toasts.length - 1; i >= 0; i--) {
@@ -1321,8 +1473,6 @@ const app = createApp({
                     }
                 }
             }, 100);
-
-            // Resize Observer
             resizeObserver = new ResizeObserver(() => {
                 if(!isDraggingNode.value) recalcGroupBounds();
             });
@@ -1340,19 +1490,18 @@ const app = createApp({
         });
 
         const onKeyDown = (e) => {
-            if(modal.visible) return; // Modal open
+            if(modal.visible) return; 
             if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
+
+            if (e.ctrlKey && e.key === 'z') { e.preventDefault(); history.undo(); return; }
+            if (e.ctrlKey && e.key === 'y') { e.preventDefault(); history.redo(); return; }
 
             if (e.key === 'Delete' || e.key === 'Backspace') {
                 if (selectedConnectionId.value) {
-                    showConfirm('Delete Connection?', 'Are you sure you want to remove this connection?', () => {
-                        const idx = activeConnections.value.findIndex(c => c.id === selectedConnectionId.value);
-                        if(idx > -1) {
-                             activeConnections.value.splice(idx, 1);
-                             markActiveDirty();
-                        }
-                        selectedConnectionId.value = null;
-                    });
+                    // COMMAND: Delete Connection
+                    history.execute(new CmdDeleteConnection(activeConnections.value, selectedConnectionId.value));
+                    selectedConnectionId.value = null;
+                    markActiveDirty();
                 } else if (selectedNodeIds.size > 0) {
                     deleteSelected();
                 }
@@ -1458,8 +1607,7 @@ const app = createApp({
             if (ui.contextMenu.visible) {
                 ui.contextMenu.visible = false;
             }
-            if (e.button === 0 && !e.altKey) { // Left click for Selection
-                // Prepare box selection
+            if (e.button === 0 && !e.altKey) { 
                 isSelecting.value = true;
                 selectionRect.visible = true;
                 selectionRect.startX = e.clientX;
@@ -1469,7 +1617,6 @@ const app = createApp({
                 selectionRect.w = 0;
                 selectionRect.h = 0;
 
-                // Handle additive selection state
                 if (!e.shiftKey && !e.ctrlKey) {
                     selectedNodeIds.clear();
                 }
@@ -1478,7 +1625,6 @@ const app = createApp({
                 selectedNodeId.value = null;
                 selectedConnectionId.value = null;
 
-                // Cache node positions for performant dragging
                 boxSelectCache.length = 0;
                 activeNodes.value.forEach(n => {
                     let w = 240, h = 200;
@@ -1491,7 +1637,7 @@ const app = createApp({
                     boxSelectCache.push({ id: n.id, x: n.x, y: n.y, w, h });
                 });
 
-            } else if (e.button === 1) { // Middle click for Pan
+            } else if (e.button === 1) { 
                 startPan(e);
             }
         };
@@ -1509,8 +1655,10 @@ const app = createApp({
                 data: { label: 'Group ' + groupId, w: 100, h: 100 }
             };
 
-            activeNodes.value.push(groupNode);
-            nodes.forEach(n => n.groupId = groupId);
+            // COMMAND: Add Node (Group)
+            history.execute(new CmdAddNode(activeNodes.value, groupNode));
+            
+            nodes.forEach(n => n.groupId = groupId); // This mutation isn't undoable easily without complex commands, simplification: grouping is persistent for now unless we add CmdGroupNodes.
             selectedNodeIds.clear();
             recalcGroupBounds();
             ui.contextMenu.visible = false;
@@ -1537,15 +1685,10 @@ const app = createApp({
             const d = activeDialog.value;
             if (!d) return;
             const groups = d.nodes.filter(n => n.type === 'Group');
-            const groupsToDelete = new Set();
-
+            
             groups.forEach(g => {
                 const children = d.nodes.filter(n => n.groupId === g.id);
-                
-                if (children.length === 0) {
-                    groupsToDelete.add(g.id);
-                    return;
-                }
+                if (children.length === 0) return;
 
                 let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
                 children.forEach(n => {
@@ -1568,16 +1711,11 @@ const app = createApp({
 
                 const padding = 20; 
                 const headerOffset = 45; 
-
                 g.x = minX - padding;
                 g.y = minY - padding - headerOffset;
                 g.data.w = (maxX - minX) + (padding * 2);
                 g.data.h = (maxY - minY) + (padding * 2) + headerOffset;
             });
-
-            if (groupsToDelete.size > 0) {
-                d.nodes = d.nodes.filter(n => !groupsToDelete.has(n.id));
-            }
         };
 
         const startNodeDrag = (node, e) => {
@@ -1604,8 +1742,6 @@ const app = createApp({
             if (isSelecting.value) {
                 const currentX = e.clientX;
                 const currentY = e.clientY;
-
-                // UI Rect
                 const left = Math.min(selectionRect.startX, currentX);
                 const top = Math.min(selectionRect.startY, currentY);
                 const width = Math.abs(currentX - selectionRect.startX);
@@ -1614,34 +1750,28 @@ const app = createApp({
                 selectionRect.x = left; selectionRect.y = top;
                 selectionRect.w = width; selectionRect.h = height;
 
-                // World Coordinates Rect
                 const worldLeft = (left - rect.left - pan.x) / zoom.value;
                 const worldTop = (top - rect.top - pan.y) / zoom.value;
                 const worldRight = worldLeft + (width / zoom.value);
                 const worldBottom = worldTop + (height / zoom.value);
 
-                // Check Overlaps
                 const inSelection = new Set();
                 for (const node of boxSelectCache) {
-                     // Simple AABB intersection
                      if (node.x < worldRight && node.x + node.w > worldLeft &&
                          node.y < worldBottom && node.y + node.h > worldTop) {
                          inSelection.add(node.id);
                      }
                 }
 
-                // Apply Selection (Additive/Subtractive logic via Shift)
                 if (e.shiftKey || e.ctrlKey) {
-                    // Additive: Initial + New
                     selectedNodeIds.clear();
                     initialSelectionSnapshot.forEach(id => selectedNodeIds.add(id));
                     inSelection.forEach(id => selectedNodeIds.add(id));
                 } else {
-                    // Replace
                     selectedNodeIds.clear();
                     inSelection.forEach(id => selectedNodeIds.add(id));
                 }
-                return; // Skip other interactions
+                return; 
             }
 
             const wPos = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
@@ -1688,13 +1818,11 @@ const app = createApp({
                 if (dragItem.value.type !== 'Group') {
                     const cx = dragItem.value.x + 120;
                     const cy = dragItem.value.y + 100;
-                    
                     const target = activeNodes.value.find(g => 
                         g.type === 'Group' && 
                         cx > g.x && cx < g.x + g.data.w &&
                         cy > g.y && cy < g.y + g.data.h
                     );
-                    
                     if (target) {
                         if (dragItem.value.groupId !== target.id) hoverGroupId.value = target.id;
                     } else if (dragItem.value.groupId) {
@@ -1715,22 +1843,47 @@ const app = createApp({
                 selectionRect.visible = false;
             }
 
-            if (isDraggingNode.value && dragItem.value && dragItem.value.type !== 'Group') {
-                if (hoverGroupId.value) {
-                    selectedNodeIds.forEach(id => {
-                        const n = activeNodes.value.find(node => node.id === id);
-                        if (n && n.type !== 'Group') n.groupId = hoverGroupId.value;
-                    });
-                } 
-                else if (removeGroupId.value) {
-                    selectedNodeIds.forEach(id => {
-                        const n = activeNodes.value.find(node => node.id === id);
-                        if (n && n.type !== 'Group' && n.groupId === removeGroupId.value) {
-                            n.groupId = null;
-                        }
-                    });
+            if (isDraggingNode.value && dragItem.value) {
+                // Check if moved
+                const movedNodesMap = {};
+                let hasMoved = false;
+                
+                const idsToCheck = new Set(selectedNodeIds);
+                if (dragItem.value.type === 'Group') {
+                    activeNodes.value.forEach(n => { if(n.groupId === dragItem.value.id) idsToCheck.add(n.id); });
                 }
-                recalcGroupBounds();
+
+                idsToCheck.forEach(id => {
+                     const n = activeNodes.value.find(x => x.id === id);
+                     const init = initialNodePositions[id];
+                     if(n && init && (n.x !== init.x || n.y !== init.y)) {
+                         movedNodesMap[id] = { x: n.x, y: n.y, oldX: init.x, oldY: init.y };
+                         hasMoved = true;
+                     }
+                });
+
+                if(hasMoved) {
+                    // COMMAND: Move Node
+                    history.execute(new CmdMoveNodes(movedNodesMap, activeNodes.value));
+                }
+
+                if (dragItem.value.type !== 'Group') {
+                    if (hoverGroupId.value) {
+                        selectedNodeIds.forEach(id => {
+                            const n = activeNodes.value.find(node => node.id === id);
+                            if (n && n.type !== 'Group') n.groupId = hoverGroupId.value;
+                        });
+                    } 
+                    else if (removeGroupId.value) {
+                        selectedNodeIds.forEach(id => {
+                            const n = activeNodes.value.find(node => node.id === id);
+                            if (n && n.type !== 'Group' && n.groupId === removeGroupId.value) {
+                                n.groupId = null;
+                            }
+                        });
+                    }
+                    recalcGroupBounds();
+                }
             }
 
             isPanning.value = false; isDraggingNode.value = false; dragItem.value = null; 
@@ -1776,7 +1929,6 @@ const app = createApp({
             
             if(type === 'Text') {
                 const path = getDialogPath(activeDialogId.value);
-                // Added note field
                 node.data = { characterId: null, key: `${path}.text.${id}`, note: '', translations: {}, answers: [] };
                 project.settings.languages.forEach(l => node.data.translations[l] = '');
             } else if (type === 'SetVar') node.data = { variableId: null, operation: '=', value: '' };
@@ -1791,23 +1943,30 @@ const app = createApp({
             else if (type === 'Start') node.data = {};
             else if (type === 'End') node.data = { nextDialogId: null };
 
-            activeNodes.value.push(node);
-            ui.contextMenu.visible = false;
+            // COMMAND: Add Node
+            history.execute(new CmdAddNode(activeNodes.value, node));
             
-            // Mark validation needed
+            ui.contextMenu.visible = false;
             nextTick(() => { 
                 updateTick.value++; 
                 markActiveDirty(); 
             });
         };
+
         const deleteNode = (id) => {
             showConfirm("Delete Node?", "Are you sure you want to delete this node?", () => {
                 const nodeToDelete = activeNodes.value.find(n => n.id === id);
                 if (nodeToDelete && nodeToDelete.type === 'Group') {
                     const children = activeNodes.value.filter(n => n.groupId === id);
-                    children.forEach(c => _deleteNodeInternal(c.id));
+                    children.forEach(c => {
+                         // Simplify: Ungroup children first
+                         c.groupId = null;
+                    });
                 }
-                _deleteNodeInternal(id);
+                
+                // COMMAND: Delete Node
+                history.execute(new CmdDeleteNode(activeNodes.value, activeConnections.value, id));
+
                 recalcGroupBounds();
                 markActiveDirty();
                 nextTick(() => updateTick.value++);
@@ -1819,11 +1978,9 @@ const app = createApp({
             showConfirm("Delete Selected?", `Delete ${selectedNodeIds.size} node(s)?`, () => {
                 selectedNodeIds.forEach(id => {
                     const nodeToDelete = activeNodes.value.find(n => n.id === id);
-                    if (nodeToDelete && nodeToDelete.type === 'Group') {
-                        const children = activeNodes.value.filter(n => n.groupId === id);
-                        children.forEach(c => _deleteNodeInternal(c.id));
+                    if(nodeToDelete) {
+                        history.execute(new CmdDeleteNode(activeNodes.value, activeConnections.value, id));
                     }
-                    _deleteNodeInternal(id);
                 });
                 selectedNodeIds.clear();
                 recalcGroupBounds();
@@ -1831,12 +1988,6 @@ const app = createApp({
                 nextTick(() => updateTick.value++);
             });
             ui.contextMenu.visible = false;
-        };
-
-        const _deleteNodeInternal = (id) => {
-            const d = activeDialog.value;
-            d.nodes = d.nodes.filter(n => n.id !== id);
-            d.connections = d.connections.filter(c => c.fromNode !== id && c.toNode !== id);
         };
 
         const startConnect = (nodeId, socket, type, event) => {
@@ -1869,7 +2020,6 @@ const app = createApp({
                 fromNode = connStart.nodeId; fromSocket = connStart.socket; toNode = nodeId; toSocket = socket;
             }
 
-            // --- STRICT VALIDATION FOR INPUTS ---
             const targetSocket = connStart.isInput ? connStart.socket : socket;
             const targetNodeId = connStart.isInput ? connStart.nodeId : nodeId;
             const sourceNodeId = connStart.isInput ? nodeId : connStart.nodeId;
@@ -1877,7 +2027,6 @@ const app = createApp({
             const targetNode = activeNodes.value.find(n => n.id === targetNodeId);
             const sourceNode = activeNodes.value.find(n => n.id === sourceNodeId);
 
-            // 1. Answer Conditions
             if(targetSocket.startsWith('in_ans_cond_')) {
                 if(!isValidBoolSource(sourceNode)) {
                     addToast("Conditions only accept Boolean variables or Logic Gates.", "error");
@@ -1886,7 +2035,6 @@ const app = createApp({
                 }
             }
             
-            // 2. Logic Gate Inputs
             if(['And','NAnd','Or','NOr','XOr'].includes(targetNode.type)) {
                 if(!isValidBoolSource(sourceNode)) {
                     addToast("Logic Gates only accept Boolean variables or other Gates.", "error");
@@ -1895,9 +2043,7 @@ const app = createApp({
                 }
             }
 
-            // 3. FireEvent Inputs (Args)
             if(targetNode.type === 'FireEvent' && targetSocket.startsWith('in_')) {
-                // Allow GetVar, SetVar, Compare, Logic
                 const allowedTypes = ['GetVar', 'SetVar', 'Compare', 'And', 'NAnd', 'Or', 'NOr', 'XOr'];
                 if(!allowedTypes.includes(sourceNode.type)) {
                     addToast("Events only accept Variables, Logic, or Conditions as arguments.", "error");
@@ -1905,11 +2051,11 @@ const app = createApp({
                     return;
                 }
             }
-            // ---------------------------------------
 
             const newConn = { id: getUniqueId(), fromNode, fromSocket, toNode, toSocket };
             if (!activeConnections.value.find(c => c.fromNode === newConn.fromNode && c.fromSocket === newConn.fromSocket && c.toNode === newConn.toNode && c.toSocket === newConn.toSocket)) {
-                activeConnections.value.push(newConn);
+                // COMMAND: Add Connection
+                history.execute(new CmdAddConnection(activeConnections.value, newConn));
             }
             isConnecting.value = false;
             markActiveDirty();
@@ -1917,7 +2063,6 @@ const app = createApp({
         };
         const canDrop = (dir, type) => {
             if (!isConnecting.value || connStart.type !== type) return false;
-            // Logic for dropping onto "in" sockets
             if ((!connStart.isInput && dir === 'in') || (connStart.isInput && dir === 'out')) {
                 return true; 
             }
@@ -1931,7 +2076,6 @@ const app = createApp({
             return `M ${sx} ${sy} C ${sx + dist} ${sy}, ${ex - dist} ${ey}, ${ex} ${ey}`;
         };
         
-        // MODIFIED: Just selects, no prompt
         const selectConnection = (id) => { 
             selectedConnectionId.value = id; 
             selectedNodeIds.clear(); 
@@ -1944,7 +2088,7 @@ const app = createApp({
                 if(idx > -1) {
                     project.dialogs.splice(idx, 1);
                     activeDialogId.value = project.dialogs.length ? project.dialogs[0].id : null;
-                    setError(id, []); // Clear errors for deleted dialog
+                    setError(id, []); 
                 }
             });
         };
@@ -1973,8 +2117,8 @@ const app = createApp({
 
         const addCharacter = () => {
              const h = Math.floor(Math.random() * 360);
-             const s = 40 + Math.floor(Math.random() * 20); // 40-60
-             const l = 50 + Math.floor(Math.random() * 20); // 50-70
+             const s = 40 + Math.floor(Math.random() * 20); 
+             const l = 50 + Math.floor(Math.random() * 20); 
              project.characters.push({ id: getUniqueId(), name: 'New Char', color: hslToHex(h,s,l), description: '', variables: [] });
              validateChars();
         };
@@ -2027,7 +2171,6 @@ const app = createApp({
         const toggle = (s) => ui.sections[s] = !ui.sections[s];
         
         const addAnswer = (node) => {
-             // FIX 1: If it's the first answer, remove existing 'Next' connection
              if (node.data.answers.length === 0) {
                  activeDialog.value.connections = activeDialog.value.connections.filter(c => 
                      !(c.fromNode === node.id && c.fromSocket === 'out')
@@ -2036,7 +2179,6 @@ const app = createApp({
 
              const ansId = Math.floor(Math.random() * 100000);
              const path = getDialogPath(activeDialogId.value);
-             // Added note field to answer
              const ans = { key: `${path}.text.${node.id}.answers.${ansId}`, note: '', translations: {} };
              project.settings.languages.forEach(l => ans.translations[l] = '');
              node.data.answers.push(ans);
@@ -2045,26 +2187,21 @@ const app = createApp({
         };
 
         const removeAnswer = (node, idx) => {
-            // FIX 2a: Remove connection for this answer
             const sockToRemove = 'out_ans_' + idx;
             const condSockToRemove = 'in_ans_cond_' + idx;
             
-            // Remove outgoing flows AND incoming conditions
             activeDialog.value.connections = activeDialog.value.connections.filter(c => 
                 !((c.fromNode === node.id && c.fromSocket === sockToRemove) || 
                   (c.toNode === node.id && c.toSocket === condSockToRemove))
             );
 
-            // FIX 2b: Shift connections for subsequent answers
             activeDialog.value.connections.forEach(c => {
-                // Shift Outputs
                 if(c.fromNode === node.id && c.fromSocket.startsWith('out_ans_')) {
                     const cIdx = parseInt(c.fromSocket.replace('out_ans_', ''));
                     if(cIdx > idx) {
                         c.fromSocket = 'out_ans_' + (cIdx - 1);
                     }
                 }
-                // Shift Inputs (Conditions)
                 if(c.toNode === node.id && c.toSocket.startsWith('in_ans_cond_')) {
                     const cIdx = parseInt(c.toSocket.replace('in_ans_cond_', ''));
                     if(cIdx > idx) {
@@ -2088,7 +2225,6 @@ const app = createApp({
         const getNodeHeaderColor = (node) => {
             if (node.type === 'Text' && node.data.characterId) {
                 const c = project.characters.find(ch => ch.id === node.data.characterId);
-                // Ensure we return a valid color, otherwise fallback
                 if (c && c.color) return c.color;
             }
             return getNodeColor(node.type);
@@ -2103,15 +2239,12 @@ const app = createApp({
         };
         
         const getVarType = (id) => {
-            // Check current dialog (local)
             if (activeDialog.value && activeDialog.value.variables) {
                 const v = activeDialog.value.variables.find(v => v.id === id);
                 if(v) return v.type;
             }
-            // Check global
             let v = project.variables.find(v => v.id === id);
             if(v) return v.type;
-            // Check characters
             for(const c of project.characters) {
                 if(c.variables) {
                     v = c.variables.find(v => v.id === id);
@@ -2128,7 +2261,6 @@ const app = createApp({
              }
         };
 
-        // NEW: AUTO DETECT TYPE FROM INPUT CONNECTION
         const getConnectedType = (node) => {
             const conn = activeConnections.value.find(c => c.toNode === node.id && c.toSocket === 'in_val');
             if (conn) {
@@ -2163,10 +2295,8 @@ const app = createApp({
 
         const addLogicInput = (node) => { node.data.inputCount++; markActiveDirty(); nextTick(() => updateTick.value++); };
         const remLogicInput = (node) => { 
-            // Allow going down to 0 inputs for FireEvent
             const min = node.type === 'FireEvent' ? 0 : 2;
             if(node.data.inputCount > min) { 
-                // Remove connections to the deleted socket
                 const sockName = 'in_' + (node.data.inputCount - 1);
                 activeConnections.value = activeConnections.value.filter(c => !(c.toNode === node.id && c.toSocket === sockName));
                 node.data.inputCount--; 
@@ -2175,7 +2305,6 @@ const app = createApp({
             } 
         };
 
-        // Context Menu Search
         const menuItems = [
             { type: 'Text', label: 'Text Node', icon: 'chat_bubble', group: 'Dialogue' },
             { type: 'Start', label: 'Start', icon: 'play_arrow', group: 'Flow' },
@@ -2204,19 +2333,17 @@ const app = createApp({
         });
 
         const getProjectJson = () => {
-            // Save UI state to project
             project.uiState = {
                 gridSize: editor.gridSize,
                 snap: editor.snap,
                 sections: ui.sections,
                 expandedFolders: Array.from(expandedFolderIds),
                 collapsedCharacters: Array.from(collapsedCharacterIds),
-                overlayCollapsed: ui.overlayCollapsed // Save overlay state
+                overlayCollapsed: ui.overlayCollapsed
             };
             return JSON.stringify(project, null, 2);
         };
 
-        // --- MODIFIED: Generate Runtime JSON ---
         const getRuntimeJson = () => {
             const runtime = {
                 settings: project.settings,
@@ -2225,17 +2352,13 @@ const app = createApp({
                 dialogs: []
             };
 
-            // Helper to resolve var ID to name/scope
             const resolveVar = (varId, currentDialog) => {
-                // Check Local
                 if (currentDialog && currentDialog.variables) {
                     const l = currentDialog.variables.find(v => v.id === varId);
                     if(l) return { name: l.name, scope: 'local', type: l.type };
                 }
-                // Check Global
                 const g = project.variables.find(v => v.id === varId);
                 if(g) return { name: g.name, scope: 'global', type: g.type };
-                // Check Character
                 for(const c of project.characters) {
                     if(c.variables) {
                         const cv = c.variables.find(v => v.id === varId);
@@ -2245,10 +2368,8 @@ const app = createApp({
                 return null;
             };
 
-            // 1. Variables (Cleaned)
             project.variables.forEach(v => runtime.globalVars[v.name] = { type: v.type, value: v.value });
 
-            // 2. Characters (Cleaned)
             project.characters.forEach(c => {
                 runtime.characters[c.id] = { name: c.name, variables: {} };
                 if (c.variables) {
@@ -2256,17 +2377,15 @@ const app = createApp({
                 }
             });
 
-            // 3. Dialogs (Flattens folders, removes visual data, inlines translations)
             project.dialogs.forEach(d => {
                 const dialogExport = {
                     id: d.id,
                     name: d.name,
-                    variables: {}, // Export local vars definition
+                    variables: {},
                     nodes: [],
                     connections: []
                 };
 
-                // Add Dialog Variables to Export
                 if (d.variables) {
                     d.variables.forEach(v => {
                         dialogExport.variables[v.name] = { 
@@ -2278,7 +2397,7 @@ const app = createApp({
                 }
 
                 const cleanNodes = d.nodes
-                    .filter(n => n.type !== 'Group') // Ignore Groups in Runtime
+                    .filter(n => n.type !== 'Group')
                     .map(n => {
                     const clean = { id: n.id, type: n.type };
 
@@ -2286,16 +2405,14 @@ const app = createApp({
                         clean.characterId = n.data.characterId;
                         clean.textKey = n.data.key;
                         
-                        // Inline Text Translations
                         clean.translations = {};
                         project.settings.languages.forEach(lang => {
                             clean.translations[lang] = n.data.translations[lang] || '';
                         });
 
-                        // Inline Choices/Answers as Array of Objects
                         clean.choices = n.data.answers.map((a, idx) => {
                              const choiceObj = {
-                                 id: 'out_ans_' + idx, // The anchor/socket ID to match connection.fromSocket
+                                 id: 'out_ans_' + idx,
                                  textKey: a.key,
                                  translations: {}
                              };
@@ -2303,18 +2420,16 @@ const app = createApp({
                                  choiceObj.translations[lang] = a.translations[lang] || '';
                              });
 
-                             // Export Condition Logic (Reference to Node ID)
                              const condSocket = 'in_ans_cond_' + idx;
                              const condConn = d.connections.find(c => c.toNode === n.id && c.toSocket === condSocket);
                              if (condConn) {
-                                 choiceObj.conditionNodeId = condConn.fromNode; // The engine should eval this node
+                                 choiceObj.conditionNodeId = condConn.fromNode; 
                              }
 
                              return choiceObj;
                         });
                     }
                     else if (n.type === 'Compare') {
-                         // Resolve input variable via connection
                          const conn = d.connections.find(c => c.toNode === n.id && c.toSocket === 'in_val');
                          if (conn) {
                              const source = d.nodes.find(sn => sn.id === conn.fromNode);
@@ -2327,15 +2442,14 @@ const app = createApp({
                          clean.value = n.data.compareValue;
                     }
                     else if (['And','NAnd','Or','NOr','XOr'].includes(n.type)) {
-                        // Export Logic Gate Inputs as array of Source Node IDs
                         clean.inputs = [];
                         for(let i=0; i<n.data.inputCount; i++) {
                             const socket = 'in_' + i;
                             const conn = d.connections.find(c => c.toNode === n.id && c.toSocket === socket);
                             if(conn) {
-                                clean.inputs.push(conn.fromNode); // Store Source Node ID
+                                clean.inputs.push(conn.fromNode); 
                             } else {
-                                clean.inputs.push(null); // Unconnected input
+                                clean.inputs.push(null);
                             }
                         }
                     }
@@ -2346,7 +2460,7 @@ const app = createApp({
                             const socket = 'in_' + i;
                             const conn = d.connections.find(c => c.toNode === n.id && c.toSocket === socket);
                             if(conn) {
-                                clean.args.push(conn.fromNode); // Store Source Node ID
+                                clean.args.push(conn.fromNode); 
                             } else {
                                 clean.args.push(null); 
                             }
@@ -2370,17 +2484,14 @@ const app = createApp({
                 });
 
                 dialogExport.nodes = cleanNodes;
-
-                // Connections: Remove visual styling, keep topology AND ID
                 dialogExport.connections = d.connections.map(c => ({
-                    id: c.id, // Explicit ID for runtime traversal
+                    id: c.id, 
                     from: c.fromNode, 
                     fromSocket: c.fromSocket,
                     to: c.toNode, 
                     toSocket: c.toSocket
                 }));
 
-                // Push object with ID included
                 runtime.dialogs.push(dialogExport);
             });
 
@@ -2388,10 +2499,8 @@ const app = createApp({
         };
 
         const getCsvData = (headers, rows) => {
-            // Convert to CSV String with escaping
             return rows.map(r => r.map(field => {
                 const str = String(field || '');
-                // Escape quotes and wrap in quotes if contains comma, quote or newline
                 if (str.includes(',') || str.includes('"') || str.includes('\n')) {
                     return `"${str.replace(/"/g, '""')}"`;
                 }
@@ -2441,26 +2550,16 @@ const app = createApp({
                         if (c) { charName = c.name; charDesc = c.description || ''; }
                     }
 
-                    // Main Text
                     const row = [
-                        n.data.key, 
-                        "Line", 
-                        charName, 
-                        charDesc, 
-                        n.data.note || '',
+                        n.data.key, "Line", charName, charDesc, n.data.note || '',
                         n.data.translations[loc.baseLang] || ''
                     ];
                     loc.targetLangs.forEach(l => row.push(n.data.translations[l] || ''));
                     rows.push(row);
 
-                    // Answers
                     n.data.answers.forEach(ans => {
                         const ansRow = [
-                            ans.key, 
-                            "Choice", 
-                            "Player", 
-                            "Player Selection", 
-                            ans.note || '',
+                            ans.key, "Choice", "Player", "Player Selection", ans.note || '',
                             ans.translations[loc.baseLang] || ''
                         ];
                         loc.targetLangs.forEach(l => ansRow.push(ans.translations[l] || ''));
@@ -2523,10 +2622,9 @@ const app = createApp({
             const r = new FileReader();
             r.onload = (evt) => { processLocImport(evt.target.result); };
             r.readAsText(f);
-            e.target.value = ''; // Reset
+            e.target.value = ''; 
         };
 
-        // Simple CSV Parser handling quotes
         const parseCSV = (str) => {
             const arr = [];
             let quote = false;
@@ -2557,8 +2655,7 @@ const app = createApp({
                 const keyIdx = headers.findIndex(h => h.trim().toLowerCase() === 'key');
                 if(keyIdx === -1) throw new Error("Missing 'Key' column");
 
-                // Map columns to languages
-                const langMap = {}; // { colIndex: 'langCode' }
+                const langMap = {}; 
                 headers.forEach((h, idx) => {
                     const match = h.match(/Target \[(.+)\]/i);
                     if(match && match[1] && project.settings.languages.includes(match[1])) {
@@ -2574,9 +2671,8 @@ const app = createApp({
                 let updatedCount = 0;
                 let ignoredCount = 0;
 
-                // Build fast lookup
                 const nodeMap = new Map();
-                const ansMap = new Map(); // Key -> { node, index }
+                const ansMap = new Map(); 
 
                 project.dialogs.forEach(d => {
                     d.nodes.filter(n => n.type === 'Text').forEach(n => {
@@ -2605,7 +2701,6 @@ const app = createApp({
                         continue;
                     }
 
-                    // Update found
                     let rowUpdated = false;
                     for(const colIdx in langMap) {
                         const lang = langMap[colIdx];
@@ -2628,7 +2723,6 @@ const app = createApp({
 
         const processImport = () => {
             try {
-                // Strict JSON Parse
                 const d = JSON.parse(importData.value);
                 
                 if(d.dialogs) { 
@@ -2636,22 +2730,19 @@ const app = createApp({
                     if(d.characters) {
                         d.characters.forEach(c => {
                             if(!c.variables) c.variables = [];
-                            if(!c.description) c.description = ''; // Init description
+                            if(!c.description) c.description = ''; 
                         });
                     }
                     d.dialogs.forEach(dialog => {
                         if (dialog.folderId === undefined) dialog.folderId = null;
-                        if (!dialog.variables) dialog.variables = []; // Init variables
+                        if (!dialog.variables) dialog.variables = []; 
                         
-                        // Default resetOnStart for imported files
                         dialog.variables.forEach(v => {
                             if (v.resetOnStart === undefined) v.resetOnStart = true;
                         });
 
                         dialog.nodes.forEach(n => {
-                            // Recover/Validate Data Structures
                             if(n.type === 'Text') {
-                                // Init new note field if missing
                                 if(n.data.note === undefined) n.data.note = '';
 
                                 if(n.data.answers) {
@@ -2662,7 +2753,6 @@ const app = createApp({
                                             delete a.text;
                                         }
                                         if(!a.key) a.key = 'ANS_' + Math.floor(Math.random() * 10000);
-                                        // Init new note field if missing
                                         if(a.note === undefined) a.note = '';
                                     });
                                 }
@@ -2670,11 +2760,9 @@ const app = createApp({
                             if(n.type === 'Compare' && !n.data.compType) {
                                 n.data.compType = 'string';
                             }
-                            // Logic Nodes
                             if(['And','NAnd','Or','NOr','XOr'].includes(n.type)) {
                                 if(!n.data.inputCount) n.data.inputCount = 2;
                             }
-                            // FireEvent Node
                             if(n.type === 'FireEvent') {
                                 if(n.data.inputCount === undefined) n.data.inputCount = 0;
                                 if(n.data.eventName === undefined) n.data.eventName = '';
@@ -2684,7 +2772,6 @@ const app = createApp({
                     
                     Object.assign(project, d); 
                     
-                    // LOAD UI STATE
                     if (project.uiState) {
                         if(project.uiState.gridSize) editor.gridSize = project.uiState.gridSize;
                         if(project.uiState.snap !== undefined) editor.snap = project.uiState.snap;
@@ -2702,8 +2789,6 @@ const app = createApp({
 
                     showExport.value = false; 
                     addToast("Project Loaded Successfully", "success"); 
-                    
-                    // Validate EVERYTHING after load
                     markAllDirty();
                     nextTick(() => { setTimeout(() => { updateTick.value++; fitView(); }, 100) });
                 }
@@ -2716,7 +2801,7 @@ const app = createApp({
 
         return {
             project, activeDialogId, activeDialog, ui, canvasRef, pan, zoom, activeNodes, activeConnections,
-            showExport, importData, newLang, editor, loc,
+            showExport, importData, newLang, editor, loc, history,
             dragLinePath, selectedNodeId, selectedConnectionId, selectedNodeIds, hoverGroupId, removeGroupId,
             handleMove, handleUp, startPan, handleZoom, startNodeDrag, onNodeMouseDown, onCanvasMouseDown,
             addNode, deleteNode, createGroup, detachFromGroup, hasGroupedNodesSelected, deleteSelected,
@@ -2735,7 +2820,8 @@ const app = createApp({
             collapsedCharacterIds, toggleChar, // New sidebar state
             toastSystem, addToast, removeToast, getToastIcon, needsExpand,
             addDialogVariable, deleteDialogVariable,
-            addLogicInput, remLogicInput, filteredMenuItems, ctxSearch
+            addLogicInput, remLogicInput, filteredMenuItems, ctxSearch,
+            saveSnapshot, commitProp // Command Helpers
         };
     }
 }).mount('#app');

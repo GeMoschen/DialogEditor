@@ -5,8 +5,12 @@ A robust, single-file visual editor for creating branching narratives, game dial
 ## ✨ Key Features
 
 * **Zero Setup:** It is a single HTML file. Open it in any modern browser (Chrome, Firefox, Edge) to start working immediately.
+* **Full Undo/Redo:**
+    * Robust history system using the Command Pattern.
+    * Revert almost any action (Move, Connect, Delete, Property Change) using the Toolbar or Keyboard Shortcuts (**Ctrl+Z** / **Ctrl+Y**).
 * **Visual Node Graph:**
     * **Infinite Canvas:** Pan and zoom freely.
+    * **Overlay Toolbar:** Quick access to History, View Reset, and Export tools.
     * **Organization:** Drag-and-drop nodes, grid snapping, and box selection.
     * **Grouping:** Use Group nodes to organize complex logic clusters visually.
 * **Advanced Logic System:**
@@ -57,9 +61,20 @@ The editor features a comprehensive set of nodes to handle flow and data:
 
 ## 🚀 Getting Started
 
-1.  Download the `DialogEditor.html` file from this repository or simply [CLICK HERE](https://gemoschen.github.io/DialogEditor/DialogEditor.html).
+1.  Download the `DialogEditor.html` file from this repository.
 2.  Open the file in Chrome, Firefox, or Edge.
 3.  Start creating!
+
+## ⌨️ Controls
+
+| Action | Shortcut |
+| :--- | :--- |
+| **Undo** | `Ctrl + Z` |
+| **Redo** | `Ctrl + Y` |
+| **Delete Selection** | `Delete` or `Backspace` |
+| **Pan Canvas** | Middle Mouse Button |
+| **Select Multiple** | Left Click + Drag |
+| **Add to Selection** | `Shift` + Click / Drag |
 
 ## 🛠 Workflow
 
