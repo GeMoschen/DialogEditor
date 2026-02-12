@@ -13,6 +13,9 @@ A robust, single-file visual editor for creating branching narratives, game dial
     * **Variable Scoping:** Support for **Global** (game-wide), **Character** (entity-specific), and **Dialog** (local/temporary) variables.
     * **Logic Gates:** Full suite of dynamic logic gates (AND, OR, XOR, NAND, NOR) with adjustable input counts.
     * **Conditional Choices:** Create choices that only appear if specific logic conditions are met (e.g., *only show "Bribe Guard" if Gold > 50*).
+* **Event System:**
+    * **Fire Events:** Trigger external game events (e.g., *PlaySound*, *UnlockAchievement*, *StartQuest*) directly from the dialogue flow.
+    * **Dynamic Arguments:** Pass variables, logic results, or conditions as arguments to your events.
 * **Localization First:**
     * Built-in support for unlimited languages.
     * **CSV Import/Export:** Seamless workflow for translators to work in Excel/Sheets.
@@ -34,6 +37,11 @@ The editor features a comprehensive set of nodes to handle flow and data:
     * Define Localization Keys and Audio Notes.
     * Add multiple **Answers/Choices**.
     * Attach **Logic Conditions** to answers to restrict visibility.
+
+### Events
+* **Fire Event:** A node to trigger signals to your game engine.
+    * Define a custom `Event Name`.
+    * Add dynamic `Arguments` to pass data (Variables, Boolean checks) with the event.
 
 ### Data & Variables
 * **Set Variable:** Modify Global, Character, or Dialog variables (Operations: `=`, `+=`, `-=`).
@@ -60,16 +68,15 @@ The editor features a comprehensive set of nodes to handle flow and data:
 3.  **Local Variables:** Use the top-right overlay to define variables specific to the current dialog (e.g., `loopCount`), with optional "Reset on Start" behavior.
 4.  **Graphing:**
     * Connect `Start` nodes to `Text` nodes.
-    * Add choices to Text nodes.
-    * Drag connections from `Answer` sockets to new nodes.
-    * Connect boolean outputs (from Compare/Logic nodes) into Answer inputs to create **Conditional Choices**.
+    * Add choices to Text nodes and attach logic to **Conditional Inputs**.
+    * Use **Fire Event** nodes to trigger scripts in your engine (e.g., "AddQuestItem").
 5.  **Export:**
     * Save your work via **Project JSON**.
     * Export for your game via **Runtime JSON**.
 
 ## 📦 Runtime Data Format
 
-The editor exports a clean, engine-agnostic JSON format designed for easy parsing. Logic and conditions are serialized to allow your engine to evaluate them at runtime.
+The editor exports a clean, engine-agnostic JSON format designed for easy parsing. Logic, conditions, and events are serialized to allow your engine to evaluate them at runtime.
 
 **Example Structure:**
 ```json
@@ -100,15 +107,14 @@ The editor exports a clean, engine-agnostic JSON format designed for easy parsin
           ]
         },
         {
-          "id": 205,
-          "type": "Compare",
-          "operator": ">",
-          "value": "10",
-          "variable": { "name": "charisma", "scope": "character", "characterId": 2 }
+          "id": 105,
+          "type": "FireEvent",
+          "eventName": "PlaySound",
+          "args": [ 301, null ] // References to data nodes (301) connected to Arg 1
         }
       ],
       "connections": [
-        { "id": 1, "from": 101, "fromSocket": "out_ans_0", "to": 102, "toSocket": "in" }
+        { "id": 1, "from": 101, "fromSocket": "out_ans_0", "to": 105, "toSocket": "in" }
       ]
     }
   ]

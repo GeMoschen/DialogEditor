@@ -136,7 +136,7 @@
         
         /* Dialog Vars Overlay */
         .dialog-vars-overlay {
-            position: absolute; top: 10px; left: 10px;
+            position: absolute; top: 10px; right: 10px;
             width: 280px; background: var(--bg-panel); 
             border: 1px solid var(--border); border-radius: 4px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 5;
@@ -629,7 +629,7 @@
                     
                     <div class="grow"></div>
                     
-                    <div v-if="['And','NAnd','Or','NOr','XOr'].includes(node.type)" class="flex center gap-sm mr-2">
+                    <div v-if="['And','NAnd','Or','NOr','XOr','FireEvent'].includes(node.type)" class="flex center gap-sm mr-2">
                         <button class="small icon-btn" @click.stop="remLogicInput(node)" title="Remove Input"><span class="icon" style="font-size:14px">remove</span></button>
                         <button class="small icon-btn" @click.stop="addLogicInput(node)" title="Add Input"><span class="icon" style="font-size:14px">add</span></button>
                     </div>
@@ -707,7 +707,7 @@
                         <select v-model="node.data.variableId" class="text-sm" @change="onSetVarChange(node); markActiveDirty()" :class="{error: !node.data.variableId}">
                             <option :value="null">Select Var...</option>
                             <optgroup label="Dialog (Local)" v-if="activeDialog">
-                                <option v-for="v in activeDialog.variables" :value="v.id"># - {{ v.name }}</option>
+                                <option v-for="v in activeDialog.variables" :value="v.id">{{ v.name }}</option>
                             </optgroup>
                             <optgroup label="Global"><option v-for="v in project.variables" :value="v.id">{{ v.name }}</option></optgroup>
                             <optgroup v-for="c in project.characters" :label="c.name"><option v-for="v in c.variables" :value="v.id">{{ c.name + "." + v.name }}</option></optgroup>
@@ -735,7 +735,7 @@
                          <select v-model="node.data.variableId" class="text-sm" :class="{error: !node.data.variableId}" @change="markActiveDirty">
                             <option :value="null">Select Var...</option>
                             <optgroup label="Dialog (Local)" v-if="activeDialog">
-                                <option v-for="v in activeDialog.variables" :value="v.id"># - {{ v.name }}</option>
+                                <option v-for="v in activeDialog.variables" :value="v.id">{{ v.name }}</option>
                             </optgroup>
                             <optgroup label="Global"><option v-for="v in project.variables" :value="v.id">{{ v.name }}</option></optgroup>
                             <optgroup v-for="c in project.characters" :label="c.name"><option v-for="v in c.variables" :value="v.id">{{ c.name + "." + v.name }}</option></optgroup>
@@ -786,6 +786,25 @@
                         <div class="socket-row right mt-2"><span class="text-sm mr-2">True</span><div class="socket-hitbox" :id="'soc-' + node.id + '-out_true'" :class="{'can-drop': canDrop('out', 'flow')}" @mousedown.stop="startConnect(node.id, 'out_true', 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'out_true', 'flow')"><div class="socket flow"></div></div></div>
                         <div class="socket-row right"><span class="text-sm mr-2">False</span><div class="socket-hitbox" :id="'soc-' + node.id + '-out_false'" :class="{'can-drop': canDrop('out', 'flow')}" @mousedown.stop="startConnect(node.id, 'out_false', 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'out_false', 'flow')"><div class="socket flow"></div></div></div>
                         <div class="socket-row right mt-2"><span class="text-sm mr-2 text-muted">Result</span><div class="socket-hitbox" :id="'soc-' + node.id + '-out_val'" :class="{'can-drop': canDrop('out', 'data')}" @mousedown.stop="startConnect(node.id, 'out_val', 'data', $event)" @mouseup.stop="finishConnect(node.id, 'out_val', 'data')"><div class="socket data"></div></div></div>
+                    </div>
+
+                    <div v-if="node.type === 'FireEvent'">
+                        <div class="socket-row left"><div class="socket-hitbox" :id="'soc-' + node.id + '-in'" :class="{'can-drop': canDrop('in', 'flow')}" @mousedown.stop="startConnect(node.id, 'in', 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'in', 'flow')"><div class="socket flow"></div></div><span class="text-sm ml-2">In</span></div>
+                        <input v-model="node.data.eventName" class="text-sm mt-2 mb-2" placeholder="Event Name" @change="markActiveDirty">
+                        
+                        <div class="flex center gap-sm mb-2">
+                            <span class="text-sm text-muted">Args: {{ node.data.inputCount }}</span>
+                            <div class="grow"></div>
+                            <button class="small icon-btn" @click.stop="remLogicInput(node)" title="Remove Arg"><span class="icon" style="font-size:14px">remove</span></button>
+                            <button class="small icon-btn" @click.stop="addLogicInput(node)" title="Add Arg"><span class="icon" style="font-size:14px">add</span></button>
+                        </div>
+
+                        <div v-for="n in node.data.inputCount" :key="n" class="socket-row left mb-1">
+                            <div class="socket-hitbox" :id="'soc-' + node.id + '-in_' + (n-1)" :class="{'can-drop': canDrop('in', 'data')}" @mousedown.stop="startConnect(node.id, 'in_' + (n-1), 'data', $event)" @mouseup.stop="finishConnect(node.id, 'in_' + (n-1), 'data')"><div class="socket data"></div></div>
+                            <span class="text-sm ml-2">Arg {{n}}</span>
+                        </div>
+
+                        <div class="socket-row right mt-2"><span class="text-sm mr-2">Out</span><div class="socket-hitbox" :id="'soc-' + node.id + '-out'" :class="{'can-drop': canDrop('out', 'flow')}" @mousedown.stop="startConnect(node.id, 'out', 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'out', 'flow')"><div class="socket flow"></div></div></div>
                     </div>
 
                 </div>
@@ -1239,6 +1258,11 @@ const app = createApp({
                 else if (['And','NAnd','Or','NOr','XOr'].includes(node.type)) {
                     // Logic Nodes validation
                     // Maybe warn if inputs disconnected? For now, we leave flexible.
+                }
+                else if (node.type === 'FireEvent') {
+                    if(!node.data.eventName) errs.push("Missing Event Name.");
+                    if(!isConnected(node.id, 'in')) errs.push("Input disconnected.");
+                    if(!isConnected(node.id, 'out')) errs.push("Output disconnected.");
                 }
 
                 setError(node.id, errs);
@@ -1761,6 +1785,9 @@ const app = createApp({
             else if (['And','NAnd','Or','NOr','XOr'].includes(type)) {
                 node.data = { inputCount: 2 };
             }
+            else if (type === 'FireEvent') {
+                node.data = { eventName: '', inputCount: 0 };
+            }
             else if (type === 'Start') node.data = {};
             else if (type === 'End') node.data = { nextDialogId: null };
 
@@ -1842,7 +1869,7 @@ const app = createApp({
                 fromNode = connStart.nodeId; fromSocket = connStart.socket; toNode = nodeId; toSocket = socket;
             }
 
-            // --- STRICT VALIDATION FOR BOOLEAN INPUTS ---
+            // --- STRICT VALIDATION FOR INPUTS ---
             const targetSocket = connStart.isInput ? connStart.socket : socket;
             const targetNodeId = connStart.isInput ? connStart.nodeId : nodeId;
             const sourceNodeId = connStart.isInput ? nodeId : connStart.nodeId;
@@ -1863,6 +1890,17 @@ const app = createApp({
             if(['And','NAnd','Or','NOr','XOr'].includes(targetNode.type)) {
                 if(!isValidBoolSource(sourceNode)) {
                     addToast("Logic Gates only accept Boolean variables or other Gates.", "error");
+                    isConnecting.value = false;
+                    return;
+                }
+            }
+
+            // 3. FireEvent Inputs (Args)
+            if(targetNode.type === 'FireEvent' && targetSocket.startsWith('in_')) {
+                // Allow GetVar, SetVar, Compare, Logic
+                const allowedTypes = ['GetVar', 'SetVar', 'Compare', 'And', 'NAnd', 'Or', 'NOr', 'XOr'];
+                if(!allowedTypes.includes(sourceNode.type)) {
+                    addToast("Events only accept Variables, Logic, or Conditions as arguments.", "error");
                     isConnecting.value = false;
                     return;
                 }
@@ -2043,6 +2081,7 @@ const app = createApp({
             if(t==='Start') return '#569cd6'; if(t==='End') return '#d16969'; if(t==='Text') return '#ce9178';
             if(t==='SetVar') return '#c586c0'; if(t==='GetVar') return '#4ec9b0'; if(t==='Compare') return '#dcdcaa';
             if(['And','NAnd','Or','NOr','XOr'].includes(t)) return '#4FC1FF';
+            if(t==='FireEvent') return '#C586C0';
             return '#888';
         };
 
@@ -2059,6 +2098,7 @@ const app = createApp({
             if(t==='Start') return 'play_arrow'; if(t==='End') return 'stop'; if(t==='Text') return 'chat_bubble';
             if(t==='SetVar') return 'edit'; if(t==='GetVar') return 'data_object'; if(t==='Compare') return 'balance';
             if(['And','NAnd','Or','NOr','XOr'].includes(t)) return 'hub';
+            if(t==='FireEvent') return 'bolt';
             return '';
         };
         
@@ -2123,7 +2163,9 @@ const app = createApp({
 
         const addLogicInput = (node) => { node.data.inputCount++; markActiveDirty(); nextTick(() => updateTick.value++); };
         const remLogicInput = (node) => { 
-            if(node.data.inputCount > 2) { 
+            // Allow going down to 0 inputs for FireEvent
+            const min = node.type === 'FireEvent' ? 0 : 2;
+            if(node.data.inputCount > min) { 
                 // Remove connections to the deleted socket
                 const sockName = 'in_' + (node.data.inputCount - 1);
                 activeConnections.value = activeConnections.value.filter(c => !(c.toNode === node.id && c.toSocket === sockName));
@@ -2138,6 +2180,7 @@ const app = createApp({
             { type: 'Text', label: 'Text Node', icon: 'chat_bubble', group: 'Dialogue' },
             { type: 'Start', label: 'Start', icon: 'play_arrow', group: 'Flow' },
             { type: 'End', label: 'End / Switch', icon: 'stop', group: 'Flow' },
+            { type: 'FireEvent', label: 'Fire Event', icon: 'bolt', group: 'Events' },
             { type: 'Compare', label: 'Compare', icon: 'balance', group: 'Logic' },
             { type: 'And', label: 'AND Gate', icon: 'hub', group: 'Logic' },
             { type: 'Or', label: 'OR Gate', icon: 'hub', group: 'Logic' },
@@ -2293,6 +2336,19 @@ const app = createApp({
                                 clean.inputs.push(conn.fromNode); // Store Source Node ID
                             } else {
                                 clean.inputs.push(null); // Unconnected input
+                            }
+                        }
+                    }
+                    else if (n.type === 'FireEvent') {
+                        clean.eventName = n.data.eventName;
+                        clean.args = [];
+                        for(let i=0; i<n.data.inputCount; i++) {
+                            const socket = 'in_' + i;
+                            const conn = d.connections.find(c => c.toNode === n.id && c.toSocket === socket);
+                            if(conn) {
+                                clean.args.push(conn.fromNode); // Store Source Node ID
+                            } else {
+                                clean.args.push(null); 
                             }
                         }
                     }
@@ -2617,6 +2673,11 @@ const app = createApp({
                             // Logic Nodes
                             if(['And','NAnd','Or','NOr','XOr'].includes(n.type)) {
                                 if(!n.data.inputCount) n.data.inputCount = 2;
+                            }
+                            // FireEvent Node
+                            if(n.type === 'FireEvent') {
+                                if(n.data.inputCount === undefined) n.data.inputCount = 0;
+                                if(n.data.eventName === undefined) n.data.eventName = '';
                             }
                         });
                     });
