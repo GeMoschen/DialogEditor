@@ -21,7 +21,7 @@ A robust, single-file visual editor for creating branching narratives, game dial
 
 ## 🚀 Getting Started
 
-1.  Download the `Dialog-Editor.html` file from this repository.
+1.  Download the `DialogEditor.html` file from this repository.
 2.  Open the file in Chrome, Firefox, or Edge.
 3.  Start creating!
 

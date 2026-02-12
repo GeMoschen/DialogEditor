@@ -1,0 +1,2357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dialog Editor</title>
+    
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+
+    <style>
+        :root {
+            --bg-dark: #1e1e1e;
+            --bg-panel: #252526;
+            --bg-header: #333333;
+            --bg-node: #2d2d30;
+            --bg-group: rgba(255, 255, 255, 0.05);
+            --accent: #569cd6;
+            --error: #f48771;
+            --success: #89d185;
+            --text-main: #cccccc;
+            --text-muted: #858585;
+            --border: #3e3e42;
+            --grid-line: #2a2a2a;
+            --socket-flow: #ffffff;
+            --socket-data: #4ec9b0;
+            --drag-target: rgba(86, 156, 214, 0.2);
+            --drag-remove: rgba(209, 105, 105, 0.2);
+            --border-remove: #d16969;
+        }
+
+        [v-cloak] { display: none; }
+        * { box-sizing: border-box; user-select: none; outline: none; }
+        body { margin: 0; padding: 0; font-family: 'Inter', sans-serif; background: var(--bg-dark); color: var(--text-main); overflow: hidden; height: 100vh; display: flex; }
+        
+        /* Utility */
+        .flex { display: flex; }
+        .col { flex-direction: column; }
+        .row { flex-direction: row; }
+        .grow { flex-grow: 1; }
+        .center { align-items: center; justify-content: center; }
+        .wrap { flex-wrap: wrap; }
+        .justify-end { justify-content: flex-end; }
+        .gap-sm { gap: 8px; }
+        .p-sm { padding: 8px; }
+        .text-sm { font-size: 12px; }
+		.text-group-header { font-size: 20px; background:none; border:none; color: #7a7a7a; width:100% }
+        .text-muted { color: var(--text-muted); }
+        .bold { font-weight: 600; }
+        .icon { font-family: 'Material Symbols Outlined'; font-size: 18px; line-height: 1; user-select: none; }
+        .ml-2 { margin-left: 8px; }
+        .mr-2 { margin-right: 8px; }
+        .mt-2 { margin-top: 8px; }
+        .mt-3 { margin-top: 16px; }
+        .mb-1 { margin-bottom: 4px; }
+		.mb-2 { margin-bottom: 8px; }
+		.mb-3 { margin-bottom: 16px; }
+        
+        button {
+            background: var(--bg-header); border: 1px solid var(--border); color: var(--text-main);
+            padding: 4px 12px; border-radius: 4px; cursor: pointer; transition: 0.2s;
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        button:hover { background: var(--border); }
+        button.primary { background: var(--accent); color: white; border: none; }
+        button.full-width { width: 100%; text-align: center; margin-bottom: 5px; padding: 8px; }
+        
+        /* Icon Button Helper */
+        button.icon-btn { padding: 4px; }
+        button.icon-btn .icon { font-size: 16px; }
+        
+        input, select, textarea {
+            background: #111; border: 1px solid var(--border); color: var(--text-main);
+            padding: 4px; border-radius: 2px; font-family: 'Inter', sans-serif; width: 100%;
+        }
+        input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+        input.error, select.error, textarea.error { border-color: var(--error); }
+
+        /* Boolean Toggle Switch */
+        .toggle-checkbox { appearance: none; display: none; }
+        .toggle-label {
+            position: relative; width: 36px; height: 18px;
+            background: #444; border: 1px solid var(--border);
+            border-radius: 9px; cursor: pointer; transition: 0.2s;
+            flex-shrink: 0;
+        }
+        .toggle-checkbox:checked + .toggle-label { background: var(--accent); border-color: var(--accent); }
+        .toggle-label::after {
+            content: ''; position: absolute; top: 1px; left: 1px;
+            width: 14px; height: 14px; background: white;
+            border-radius: 50%; transition: 0.2s;
+        }
+        .toggle-checkbox:checked + .toggle-label::after { left: 19px; }
+
+        /* Layout */
+        #app { display: flex; width: 100%; height: 100%; }
+        
+        /* Sidebar */
+        .sidebar { 
+            width: 300px; background: var(--bg-panel); border-right: 1px solid var(--border); 
+            display: flex; flex-direction: column; z-index: 10; flex-shrink: 0; 
+            height: 100vh;
+        }
+        .sidebar-header { padding: 10px; background: var(--bg-header); font-weight: 600; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+        .sidebar-content { overflow-y: auto; flex-grow: 1; display: flex; flex-direction: column; }
+        
+        .section { border-bottom: 1px solid var(--border); display: flex; flex-direction: column; }
+        .section-header { padding: 8px 12px; cursor: pointer; background: var(--bg-panel); display: flex; align-items: center; font-size: 13px; font-weight: 600; flex-shrink: 0; }
+        .section-header:hover { background: #2a2d2e; }
+        .section.grow { flex-grow: 1; min-height: 0; } 
+        .section-body { padding: 8px; background: #1e1e1e; }
+        .section.grow .section-body { flex-grow: 1; overflow-y: auto; }
+
+        .list-item { padding: 6px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px; margin-bottom: 2px; }
+        .list-item:hover { background: #2a2d2e; }
+        .list-item.active { background: var(--accent); color: white; }
+        
+        /* Tree View */
+        .tree-item { padding-left: 10px; border-left: 1px solid #333; margin-left: 4px; }
+        .tree-row { display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: 4px; cursor: pointer; }
+        .tree-row:hover { background: #2a2d2e; }
+        .tree-row.active { background: var(--accent); color: white; }
+        .tree-row.drag-over { background: var(--drag-target); outline: 1px dashed var(--accent); }
+        
+        /* Canvas */
+        .canvas-container { flex-grow: 1; position: relative; overflow: hidden; background: #111; cursor: default; }
+        
+        .grid-layer { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; 
+            background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+            opacity: 0.5;
+        }
+        .graph-layer { position: absolute; top: 0; left: 0; transform-origin: 0 0; width: 0; height: 0; }
+        
+        /* Selection Rect */
+        .selection-rect {
+            position: fixed;
+            background: rgba(86, 156, 214, 0.15);
+            border: 1px solid var(--accent);
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        /* Nodes */
+        .node {
+            position: absolute; 
+            min-width: 240px; width: auto; 
+            background: var(--bg-node); border: 1px solid var(--border);
+            border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); display: flex; flex-direction: column;
+            z-index: 2; transition: left 0.05s, top 0.05s;
+        }
+        .node.selected { border: 1px solid var(--accent); box-shadow: 0 0 0 2px rgba(86, 156, 214, 0.3); }
+        .node-header { 
+            padding: 8px 12px; background: var(--bg-header); border-radius: 8px 8px 0 0; 
+            font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px;
+            cursor: grab; position: relative;
+        }
+        .node-header:active { cursor: grabbing; }
+        .node-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; cursor: default; }
+        
+        /* Group Node */
+        .node.group {
+            background: var(--bg-group);
+            border: 2px dashed #555;
+            z-index: 0; 
+            box-shadow: none;
+            transition: none; 
+        }
+        .node.group.selected { border-color: var(--accent); }
+        .node.group.drag-target { background: var(--drag-target); border-color: var(--accent); }
+        .node.group.remove-target { background: var(--drag-remove); border-color: var(--border-remove); }
+        .node.group .node-header { background: transparent; border-bottom: none; cursor: grab; }
+
+        /* Sockets */
+        .socket-row { display: flex; justify-content: space-between; align-items: center; height: 24px; position: relative; }
+        .socket-row.right { justify-content: flex-end; }
+        .socket-row.left { justify-content: flex-start; }
+        
+        .socket-hitbox {
+            width: 24px; height: 24px; margin: -6px; 
+            display: flex; align-items: center; justify-content: center;
+            cursor: crosshair;
+        }
+        .socket { 
+            width: 12px; height: 12px; border-radius: 50%; background: #888; 
+            border: 2px solid var(--bg-node); transition: 0.2s; pointer-events: none; 
+        }
+        .socket-hitbox:hover .socket { transform: scale(1.3); border-color: white; }
+        .socket-hitbox.can-drop .socket { box-shadow: 0 0 5px 2px var(--accent); background: white; }
+
+        .socket.flow { background: var(--socket-flow); }
+        .socket.data { background: var(--socket-data); }
+        
+        /* Connections */
+        svg.connections { position: absolute; top: 0; left: 0; width: 1px; height: 1px; overflow: visible; z-index: 1; pointer-events: none; }
+        
+        .connector { cursor: pointer; }
+        .connector path.cable-hit { 
+            fill: none; stroke: transparent; stroke-width: 20px; pointer-events: stroke; 
+        }
+        .connector path.cable-vis { 
+            fill: none; stroke: #888; stroke-width: 2px; pointer-events: none; 
+            transition: stroke 0.1s, stroke-width 0.1s;
+        }
+        .connector:hover path.cable-vis { stroke: var(--accent); stroke-width: 4px; }
+        .connector.selected path.cable-vis { stroke: var(--accent); stroke-width: 3px; }
+
+        path.drag-line { stroke: var(--accent); stroke-dasharray: 5,5; opacity: 0.8; pointer-events: none; fill: none; stroke-width: 2px; }
+
+        /* Modals */
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100; display: flex; align-items: center; justify-content: center; }
+        .modal { background: var(--bg-panel); padding: 20px; border-radius: 8px; border: 1px solid var(--border); width: 450px; max-width: 90%; display: flex; flex-direction: column; gap: 10px; max-height: 90vh; overflow-y: auto;}
+        .code-preview { font-family: 'JetBrains Mono', monospace; font-size: 12px; background: #111; padding: 10px; height: 300px; overflow: auto; color: #ce9178; border: 1px solid var(--border); }
+        .tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #333; margin: 0; cursor:pointer; display: inline-flex; align-items: center; justify-content: center;}
+        .tag.active { background: var(--accent); color: white; }
+        
+        /* Context Menu */
+        .context-menu {
+            position: fixed; width: 200px; background: var(--bg-panel); border: 1px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5); z-index: 50; padding: 4px; border-radius: 4px;
+        }
+        .context-item { padding: 8px 12px; cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 8px; border-radius: 4px; }
+        .context-item:hover { background: var(--accent); color: white; }
+
+        /* Validation */
+        .warning-icon { color: var(--error); cursor: help; margin-right: 4px; animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 0.7; } 50% { opacity: 1; } 100% { opacity: 0.7; } }
+
+        /* Toasts */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 10px;
+            pointer-events: none;
+        }
+        .toast-item {
+            pointer-events: auto;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-left-width: 4px;
+            padding: 12px 16px;
+            border-radius: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            width: 320px;
+            color: var(--text-main);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        .toast-item:hover {
+            background: #2a2d2e;
+        }
+        .toast-success { border-left-color: var(--success); }
+        .toast-error { border-left-color: var(--error); }
+        .toast-warning { border-left-color: #cca700; }
+        .toast-info { border-left-color: var(--accent); }
+
+        .toast-icon { font-size: 20px; margin-top: -1px; }
+        .toast-success .toast-icon { color: var(--success); }
+        .toast-error .toast-icon { color: var(--error); }
+        .toast-warning .toast-icon { color: #cca700; }
+        .toast-info .toast-icon { color: var(--accent); }
+
+        .toast-message {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            white-space: pre-wrap;
+            font-size: 13px;
+            line-height: 1.4;
+            word-break: break-word;
+        }
+        .toast-message.expanded {
+            -webkit-line-clamp: unset;
+        }
+
+        .toast-expand-btn {
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-size: 11px;
+            padding: 0;
+            margin-top: 6px;
+            cursor: pointer;
+            text-align: left;
+            display: inline-block;
+        }
+        .toast-expand-btn:hover {
+            text-decoration: underline;
+            background: none;
+        }
+
+        /* Toast Animations */
+        .toast-anim-move,
+        .toast-anim-enter-active,
+        .toast-anim-leave-active {
+            transition: all 0.3s ease;
+        }
+        .toast-anim-enter-from,
+        .toast-anim-leave-to {
+            opacity: 0;
+            transform: translateX(100%);
+        }
+        .toast-anim-leave-active {
+            position: absolute;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app" v-cloak @mousedown="ui.contextMenu.visible = false">
+
+    <div class="toast-container" @mouseenter="toastSystem.isPaused = true" @mouseleave="toastSystem.isPaused = false">
+        <transition-group name="toast-anim">
+            <div v-for="toast in toastSystem.toasts" :key="toast.id" class="toast-item" :class="'toast-' + toast.type" @click="removeToast(toast.id)">
+                <div class="flex gap-sm" style="align-items: flex-start">
+                    <span class="icon toast-icon" v-html="getToastIcon(toast.type)"></span>
+                    <div class="flex col grow">
+                        <div class="toast-message" :class="{expanded: toast.expanded}">{{ toast.message }}</div>
+                        <button v-if="needsExpand(toast.message)" class="toast-expand-btn" @click.stop="toast.expanded = !toast.expanded">
+                            {{ toast.expanded ? 'Show less' : 'Show more' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </transition-group>
+    </div>
+    
+    <div v-if="modal.visible" class="overlay" style="z-index: 200;" @mousedown.stop>
+        <div class="modal" style="width: 320px;">
+            <h3 style="margin-top:0">{{ modal.title }}</h3>
+            <p v-if="modal.message" style="margin: 10px 0; font-size:13px; color:#ccc;">{{ modal.message }}</p>
+            <input v-if="modal.type === 'prompt'" v-model="modal.inputValue" ref="modalInput" class="mb-1" style="width:100%; margin-bottom:15px;" @keyup.enter="confirmModal">
+            <div class="flex gap-sm justify-end">
+                <button @click="closeModal">Cancel</button>
+                <button class="primary" @click="confirmModal">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="sidebar" @mousedown.stop>
+        <div class="sidebar-header">
+            <span>Dialog Editor</span>
+            <div class="flex gap-sm">
+                <button class="icon-btn" title="Reset View" @click="fitView"><span class="icon">center_focus_strong</span></button>
+                <button class="icon-btn" title="Export/Import" @click="showExport = true"><span class="icon">save</span></button>
+            </div>
+        </div>
+
+        <div class="sidebar-content">
+            <div class="section">
+                <div class="section-header" @click="toggle('settings')">
+                    <span class="icon">{{ ui.sections.settings ? 'expand_more' : 'chevron_right' }}</span>
+                    Settings
+                </div>
+                <div class="section-body" v-if="ui.sections.settings">
+                    <label class="text-sm">Language</label>
+                    <div class="flex wrap gap-sm mt-2">
+                        <button class="tag" v-for="lang in project.settings.languages" :key="lang" :class="{ active: project.settings.currentLang === lang }" @click="project.settings.currentLang = lang">{{ lang.toUpperCase() }}</button>
+                    </div>
+                    <div class="flex gap-sm mt-2">
+                        <input v-model="newLang" placeholder="Add Language" class="text-sm">
+                        <button class="icon-btn" title="Add Language" @click="addLang"><span class="icon">add</span></button>
+                    </div>
+                    <div class="flex center mt-3 mb-3" style="border-top:1px solid #333;"></div>
+                    <div class="flex center gap-sm mb-2">
+                         <label class="text-sm">Grid Size</label>
+                         <input type="number" v-model="editor.gridSize" class="text-sm" style="width:50px">
+                         <label class="text-sm ml-2">Snap</label>
+                         <input type="checkbox" v-model="editor.snap">
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-header" @click="toggle('vars')">
+                    <span class="icon">{{ ui.sections.vars ? 'expand_more' : 'chevron_right' }}</span>
+                    Variables
+                    <div class="flex gap-sm ml-2" style="margin-left:auto">
+						<button class="tag icon-btn" title="Add Variable" @click.stop="addVariable"><span class="icon">add</span></button>
+					</div>
+                </div>
+                <div class="section-body" v-if="ui.sections.vars">
+                    <div v-if="project.variables.length === 0" class="text-sm text-muted" style="text-align:center; padding: 10px;">No variables created.</div>
+                    <div v-for="v in project.variables" :key="v.id" class="list-item" style="display:block; cursor:default;" @input="validateVars">
+                        <div class="flex gap-sm center">
+                            <span v-if="validationErrors[v.id]" class="icon warning-icon" style="font-size:14px" :title="validationErrors[v.id].join('\n')">warning</span>
+                            <input v-model="v.name" class="text-sm grow" :class="{error: validationErrors[v.id]}" @change="validateVars">
+                            <button class="icon-btn" title="Delete Variable" @click="deleteVariable(v.id)"><span class="icon">delete</span></button>
+                        </div>
+                        <div class="flex gap-sm mt-2 center">
+                            <select v-model="v.type" class="text-sm" style="width: 70px;">
+                                <option value="bool">Bool</option>
+                                <option value="int">Int</option>
+                                <option value="float">Float</option>
+                                <option value="string">Str</option>
+                            </select>
+                            
+                            <template v-if="v.type === 'bool'">
+                                <div class="grow flex center">
+                                    <input type="checkbox" :id="'gvar-'+v.id" class="toggle-checkbox" v-model="v.value" true-value="true" false-value="false">
+                                    <label :for="'gvar-'+v.id" class="toggle-label"></label>
+                                    <span class="text-sm ml-2">{{ v.value === 'true' ? 'True' : 'False' }}</span>
+                                </div>
+                            </template>
+                            <template v-else>
+                                <input v-model="v.value" class="text-sm grow" placeholder="Default">
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-header" @click="toggle('chars')">
+                    <span class="icon">{{ ui.sections.chars ? 'expand_more' : 'chevron_right' }}</span>
+                    Characters
+                    <div class="flex gap-sm ml-2" style="margin-left:auto">
+						<button class="tag icon-btn" title="Add Character" @click.stop="addCharacter"><span class="icon">person_add</span></button>
+					</div>
+                </div>
+                <div class="section-body" v-if="ui.sections.chars">
+                    <div v-if="project.characters.length === 0" class="text-sm text-muted" style="text-align:center; padding: 10px;">No characters created.</div>
+                    <div v-for="c in project.characters" :key="c.id" class="list-item col" style="display: flex; align-items: stretch; cursor: default; margin-bottom: 8px;">
+                        
+                        <div class="flex gap-sm center" @click="toggleChar(c.id)" style="cursor: pointer; padding: 4px; border-radius: 4px; background: rgba(255,255,255,0.02);">
+                            <span class="icon" style="font-size:16px; color:#888; width:16px">{{ collapsedCharacterIds.has(c.id) ? 'chevron_right' : 'expand_more' }}</span>
+                            <span v-if="validationErrors[c.id]" class="icon warning-icon" style="font-size:14px" :title="validationErrors[c.id].join('\n')">warning</span>
+                            <input type="color" v-model="c.color" style="width:24px; height:24px; padding:0; border:none; background:none; cursor: pointer;" @click.stop>
+                            <input v-model="c.name" class="text-sm grow" :class="{error: validationErrors[c.id]}" @change="validateChars" @click.stop style="font-weight:600">
+                            <button class="icon-btn" @click.stop="addCharacterVariable(c.id)" title="Add Character Variable"><span class="icon">playlist_add</span></button>
+                            <button class="icon-btn" @click.stop="deleteCharacter(c.id)" title="Delete Character"><span class="icon">delete</span></button>
+                        </div>
+                        
+                        <div v-if="!collapsedCharacterIds.has(c.id)" style="padding-left: 24px;">
+                            <div class="mt-2 mb-2">
+                                <textarea v-model="c.description" class="text-sm" rows="2" placeholder="Description / Context (for translators & audio)" style="color:#aaa; font-size:11px; background: #222;"></textarea>
+                            </div>
+
+                            <div v-if="c.variables && c.variables.length > 0" class="mt-1" style="border-left: 1px solid #444; padding-left: 8px;">
+                                <div v-for="cv in c.variables" :key="cv.id" class="flex col mb-1">
+                                     <div class="flex gap-sm center">
+                                        <span v-if="validationErrors[cv.id]" class="icon warning-icon" style="font-size:12px" :title="validationErrors[cv.id].join('\n')">warning</span>
+                                        <input v-model="cv.name" class="text-sm grow" placeholder="Var Name" :class="{error: validationErrors[cv.id]}" @change="validateChars" style="background:#222">
+                                        <button class="icon-btn" @click="deleteCharacterVariable(c.id, cv.id)" title="Delete Variable"><span class="icon">close</span></button>
+                                     </div>
+                                     <div class="flex gap-sm mt-1 center">
+                                        <select v-model="cv.type" class="text-sm" style="width: 70px; background:#222">
+                                            <option value="bool">Bool</option>
+                                            <option value="int">Int</option>
+                                            <option value="float">Float</option>
+                                            <option value="string">Str</option>
+                                        </select>
+                                        
+                                        <template v-if="cv.type === 'bool'">
+                                            <div class="grow flex center">
+                                                <input type="checkbox" :id="'cvar-'+c.id+'-'+cv.id" class="toggle-checkbox" v-model="cv.value" true-value="true" false-value="false">
+                                                <label :for="'cvar-'+c.id+'-'+cv.id" class="toggle-label"></label>
+                                                <span class="text-sm ml-2">{{ cv.value === 'true' ? 'True' : 'False' }}</span>
+                                            </div>
+                                        </template>
+                                        <template v-else>
+                                            <input v-model="cv.value" class="text-sm grow" placeholder="Def" style="background:#222">
+                                        </template>
+                                     </div>
+                                </div>
+                            </div>
+                            <div v-else class="text-sm text-muted mt-1" style="font-style:italic; padding-left:8px">No variables</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section grow flex col">
+                <div class="section-header" @click="toggle('dialogs')">
+                    <span class="icon">{{ ui.sections.dialogs ? 'expand_more' : 'chevron_right' }}</span>
+                    Dialogs
+                    <div class="flex gap-sm ml-2" style="margin-left:auto">
+                        <button class="tag icon-btn" title="New Folder" @click.stop="addFolder(null)"><span class="icon" style="font-size:16px">create_new_folder</span></button>
+                        <button class="tag icon-btn" title="New Dialog" @click.stop="addDialog(null)"><span class="icon" style="font-size:16px">note_add</span></button>
+                    </div>
+                </div>
+                <div class="section-body grow" style="padding:0; overflow:auto" v-if="ui.sections.dialogs" @dragover.prevent @drop="onDrop(null)">
+                    <tree-browser :parent-id="null"></tree-browser>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="canvas-container" 
+         ref="canvasRef"
+         @mousedown="onCanvasMouseDown"
+         @mousemove="handleMove" 
+         @mouseup="handleUp" 
+         @wheel.prevent="handleZoom">
+        
+        <div class="grid-layer" :style="{ backgroundPosition: `${pan.x}px ${pan.y}px`, backgroundSize: `${editor.gridSize * zoom}px ${editor.gridSize * zoom}px` }"></div>
+        
+        <div v-if="selectionRect.visible" class="selection-rect" 
+             :style="{ left: selectionRect.x + 'px', top: selectionRect.y + 'px', width: selectionRect.w + 'px', height: selectionRect.h + 'px' }">
+        </div>
+
+        <div class="graph-layer" :style="{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }">
+            <svg class="connections">
+               <g v-for="conn in activeConnections" :key="conn.id" class="connector"
+                  :class="{ selected: selectedConnectionId === conn.id }">
+                    <path :d="getPath(conn)" class="cable-hit" @click.stop="selectConnection(conn.id)" />
+                    <path :d="getPath(conn)" class="cable-vis" />
+               </g>
+               <path v-if="dragLinePath" :d="dragLinePath" class="cable drag-line" />
+            </svg>
+
+            <div v-for="node in activeNodes" :key="node.id"
+                 class="node" :id="'node-' + node.id"
+                 :class="{ 
+                    selected: selectedNodeIds.has(node.id),
+                    group: node.type === 'Group',
+                    'drag-target': hoverGroupId === node.id,
+                    'remove-target': removeGroupId === node.id
+                 }"
+                 :style="{ 
+                    left: node.x + 'px', 
+                    top: node.y + 'px', 
+                    width: node.type === 'Group' ? node.data.w + 'px' : 'auto',
+                    height: node.type === 'Group' ? node.data.h + 'px' : 'auto',
+                    zIndex: node.type === 'Group' ? 0 : 2
+                 }"
+                 @mousedown="onNodeMouseDown(node, $event)"
+                 @input="markActiveDirty">
+                
+                <div v-if="node.type === 'Group'" class="node-header" @mousedown.left.stop="startNodeDrag(node, $event)">
+                    <input v-model="node.data.label" class="text-group-header bold" @mousedown.stop @change="markActiveDirty">
+                </div>
+                
+                <div v-else class="node-header" 
+                     :style="{ borderTop: '3px solid ' + getNodeHeaderColor(node) }"
+                     @mousedown.left.stop="startNodeDrag(node, $event)">
+                    
+                    <span v-if="validationErrors[node.id]" class="icon warning-icon" :title="validationErrors[node.id].join('\n')">warning</span>
+
+                    <span class="icon" v-html="getNodeIcon(node.type)"></span>
+                    {{ node.type }}
+                    <div class="grow"></div>
+                    <span v-if="node.type !== 'Start'" class="icon" style="font-size:14px; cursor:pointer;" @click.stop="deleteNode(node.id)">close</span>
+                </div>
+
+                <div v-if="node.type !== 'Group'" class="node-body">
+                    <div v-if="node.type === 'Text'">
+                        <div class="socket-row left">
+                            <div class="socket-hitbox" :id="'soc-' + node.id + '-in'" :class="{'can-drop': canDrop('in', 'flow')}" 
+                                 @mousedown.stop="startConnect(node.id, 'in', 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'in', 'flow')">
+                                 <div class="socket flow"></div>
+                            </div>
+                            <span class="text-sm ml-2">In</span>
+                        </div>
+                        <label class="text-sm text-muted">Character</label>
+                        <select v-model="node.data.characterId" class="text-sm" @change="markActiveDirty">
+                            <option :value="null">Narrator</option>
+                            <option v-for="c in project.characters" :value="c.id">{{ c.name }}</option>
+                        </select>
+                        <label class="text-sm text-muted">Key</label>
+                        <input v-model="node.data.key" class="text-sm mb-2" :class="{error: !node.data.key}" @change="markActiveDirty">
+                        
+                        <label class="text-sm text-muted">Audio Note</label>
+                        <input v-model="node.data.note" class="text-sm mb-2" placeholder="(Optional context for voice actors)" @change="markActiveDirty">
+
+                        <textarea v-model="node.data.translations[project.settings.currentLang]" rows="2" placeholder="Dialogue text..." :class="{error: !node.data.translations[project.settings.currentLang]}" @change="markActiveDirty"></textarea>
+                        
+                        <div class="flex center mt-2">
+                             <span class="text-sm bold">Answers</span>
+                             <button class="tag ml-2 icon-btn" title="Add Answer" @click="addAnswer(node)"><span class="icon">add</span></button>
+                        </div>
+                        <div v-for="(ans, idx) in node.data.answers" :key="idx" class="mt-2" style="border-top:1px solid #333; padding-top:4px">
+                             <div class="flex center gap-sm mb-1">
+                                <span class="text-sm text-muted" style="font-size:10px">Key:</span>
+                                <input v-model="ans.key" class="text-sm" style="font-size:10px; padding:1px; background:none; border:none; color:#888; width:100%" placeholder="Key" @change="markActiveDirty">
+                             </div>
+                             <div class="flex center gap-sm">
+                                 <input v-model="ans.translations[project.settings.currentLang]" class="text-sm grow" placeholder="Answer..." :class="{error: !ans.translations[project.settings.currentLang]}" @change="markActiveDirty">
+                                 <button class="icon-btn" title="Remove Answer" @click="removeAnswer(node, idx)"><span class="icon">remove</span></button>
+                                 <div class="socket-hitbox" :id="'soc-' + node.id + '-out_ans_' + idx" :class="{'can-drop': canDrop('out', 'flow')}"
+                                      @mousedown.stop="startConnect(node.id, 'out_ans_' + idx, 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'out_ans_' + idx, 'flow')">
+                                     <div class="socket flow"></div>
+                                 </div>
+                             </div>
+                             <div class="flex center gap-sm mt-1">
+                                 <span class="text-sm text-muted" style="font-size:10px; min-width:30px">Note:</span>
+                                 <input v-model="ans.note" class="text-sm grow" style="font-size:11px; color:#aaa; padding:2px; background:rgba(0,0,0,0.2)" placeholder="(Optional audio note)" @change="markActiveDirty">
+                             </div>
+                        </div>
+                        <div v-if="node.data.answers.length === 0" class="socket-row right mt-2">
+                            <span class="text-sm mr-2">Next</span>
+                            <div class="socket-hitbox" :id="'soc-' + node.id + '-out'" :class="{'can-drop': canDrop('out', 'flow')}"
+                                 @mousedown.stop="startConnect(node.id, 'out', 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'out', 'flow')">
+                                <div class="socket flow"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div v-if="node.type === 'Start'">
+                        <div class="socket-row right"><span class="text-sm mr-2">Start</span><div class="socket-hitbox" :id="'soc-' + node.id + '-out'" :class="{'can-drop': canDrop('out', 'flow')}" @mousedown.stop="startConnect(node.id, 'out', 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'out', 'flow')"><div class="socket flow"></div></div></div>
+                    </div>
+                    <div v-if="node.type === 'End'">
+                        <div class="socket-row left"><div class="socket-hitbox" :id="'soc-' + node.id + '-in'" :class="{'can-drop': canDrop('in', 'flow')}" @mousedown.stop="startConnect(node.id, 'in', 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'in', 'flow')"><div class="socket flow"></div></div><span class="text-sm ml-2">End</span></div>
+                        <label class="text-sm text-muted">Next Dialog</label><select v-model="node.data.nextDialogId" @change="markActiveDirty"><option :value="null">-- None --</option><option v-for="d in project.dialogs" :value="d.id">{{ d.name }}</option></select>
+                    </div>
+                    
+                    <div v-if="node.type === 'SetVar'">
+                         <div class="socket-row left"><div class="socket-hitbox" :id="'soc-' + node.id + '-in'" :class="{'can-drop': canDrop('in', 'flow')}" @mousedown.stop="startConnect(node.id, 'in', 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'in', 'flow')"><div class="socket flow"></div></div><span class="text-sm ml-2">In</span></div>
+                        <select v-model="node.data.variableId" class="text-sm" @change="onSetVarChange(node); markActiveDirty()" :class="{error: !node.data.variableId}">
+                            <option :value="null">Select Var...</option>
+                            <optgroup label="Global"><option v-for="v in project.variables" :value="v.id">{{ v.name }}</option></optgroup>
+                            <optgroup v-for="c in project.characters" :label="c.name"><option v-for="v in c.variables" :value="v.id">{{ c.name + "." + v.name }}</option></optgroup>
+                        </select>
+                        <div class="flex gap-sm center">
+                            <select v-if="['int','float'].includes(getVarType(node.data.variableId))" v-model="node.data.operation" class="text-sm" style="width:50px" @change="markActiveDirty"><option value="=">=</option><option value="+=">+=</option><option value="-=">-=</option></select>
+                            <span v-else class="text-sm bold" style="width:20px; text-align:center;">=</span>
+
+                            <template v-if="getVarType(node.data.variableId) === 'bool'">
+                                <div class="grow flex center">
+                                    <input type="checkbox" :id="'sv-'+node.id" class="toggle-checkbox" v-model="node.data.value" true-value="true" false-value="false" @change="markActiveDirty">
+                                    <label :for="'sv-'+node.id" class="toggle-label"></label>
+                                    <span class="text-sm ml-2">{{ node.data.value === 'true' ? 'True' : 'False' }}</span>
+                                </div>
+                            </template>
+                            <template v-else>
+                                <input v-model="node.data.value" class="text-sm grow" placeholder="Val" @change="markActiveDirty">
+                            </template>
+                        </div>
+                        <div class="socket-row right"><span class="text-sm mr-2">Out</span><div class="socket-hitbox" :id="'soc-' + node.id + '-out'" :class="{'can-drop': canDrop('out', 'flow')}" @mousedown.stop="startConnect(node.id, 'out', 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'out', 'flow')"><div class="socket flow"></div></div></div>
+                    </div>
+
+                    <div v-if="node.type === 'GetVar'">
+                         <select v-model="node.data.variableId" class="text-sm" :class="{error: !node.data.variableId}" @change="markActiveDirty">
+                            <option :value="null">Select Var...</option>
+                            <optgroup label="Global"><option v-for="v in project.variables" :value="v.id">{{ v.name }}</option></optgroup>
+                            <optgroup v-for="c in project.characters" :label="c.name"><option v-for="v in c.variables" :value="v.id">{{ c.name + "." + v.name }}</option></optgroup>
+                        </select>
+                        <div class="socket-row right"><span class="text-sm mr-2">Value</span><div class="socket-hitbox" :id="'soc-' + node.id + '-out'" :class="{'can-drop': canDrop('out', 'data')}" @mousedown.stop="startConnect(node.id, 'out', 'data', $event)" @mouseup.stop="finishConnect(node.id, 'out', 'data')"><div class="socket data"></div></div></div>
+                    </div>
+                    
+                    <div v-if="node.type === 'Compare'">
+                        <div class="socket-row left"><div class="socket-hitbox" :id="'soc-' + node.id + '-in'" :class="{'can-drop': canDrop('in', 'flow')}" @mousedown.stop="startConnect(node.id, 'in', 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'in', 'flow')"><div class="socket flow"></div></div><span class="text-sm ml-2">In</span></div>
+                        <div class="flex gap-sm center mt-2">
+                             <div class="socket-hitbox" :id="'soc-' + node.id + '-in_val'" :class="{'can-drop': canDrop('in', 'data')}" @mousedown.stop="startConnect(node.id, 'in_val', 'data', $event)" @mouseup.stop="finishConnect(node.id, 'in_val', 'data')"><div class="socket data"></div></div>
+                             <span class="text-sm text-muted grow" style="text-align:right; font-style:italic">
+                                 {{ getConnectedType(node) }}
+                             </span>
+                        </div>
+                        
+                        <div class="flex gap-sm mt-2">
+                             <template v-if="getConnectedType(node) === 'bool'">
+                                <select v-model="node.data.operator" class="text-sm" style="width:60px" @change="markActiveDirty"><option value="==">==</option><option value="!=">!=</option></select>
+                                <div class="grow flex center">
+                                    <input type="checkbox" :id="'cmp-'+node.id" class="toggle-checkbox" v-model="node.data.compareValue" true-value="true" false-value="false" @change="markActiveDirty">
+                                    <label :for="'cmp-'+node.id" class="toggle-label"></label>
+                                    <span class="text-sm ml-2">{{ node.data.compareValue === 'true' ? 'True' : 'False' }}</span>
+                                </div>
+                             </template>
+                             
+                             <template v-else-if="['int','float'].includes(getConnectedType(node))">
+                                <select v-model="node.data.operator" class="text-sm" style="width:60px" @change="markActiveDirty"><option value="==">==</option><option value="!=">!=</option><option value=">">&gt;</option><option value="<">&lt;</option><option value=">=">&ge;</option><option value="<=">&le;</option></select>
+                                <input type="number" v-model="node.data.compareValue" class="text-sm grow" placeholder="0" @change="markActiveDirty">
+                             </template>
+                             
+                             <template v-else>
+                                <select v-model="node.data.operator" class="text-sm" style="width:80px" @change="markActiveDirty"><option value="==">==</option><option value="!=">!=</option><option value="contains">Contains</option></select>
+                                <input v-model="node.data.compareValue" class="text-sm grow" placeholder="Text" @change="markActiveDirty">
+                             </template>
+                        </div>
+
+                        <div class="socket-row right mt-2"><span class="text-sm mr-2">True</span><div class="socket-hitbox" :id="'soc-' + node.id + '-out_true'" :class="{'can-drop': canDrop('out', 'flow')}" @mousedown.stop="startConnect(node.id, 'out_true', 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'out_true', 'flow')"><div class="socket flow"></div></div></div>
+                        <div class="socket-row right"><span class="text-sm mr-2">False</span><div class="socket-hitbox" :id="'soc-' + node.id + '-out_false'" :class="{'can-drop': canDrop('out', 'flow')}" @mousedown.stop="startConnect(node.id, 'out_false', 'flow', $event)" @mouseup.stop="finishConnect(node.id, 'out_false', 'flow')"><div class="socket flow"></div></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="ui.contextMenu.visible" class="context-menu" :style="{ left: ui.contextMenu.x + 'px', top: ui.contextMenu.y + 'px' }" @mousedown.stop>
+            <template v-if="ui.contextMenu.type === 'canvas'">
+                <div class="context-item" @click="addNode('Text')"><span class="icon">chat_bubble</span> Text Node</div>
+                <div class="context-item" @click="addNode('SetVar')"><span class="icon">edit</span> Set Variable</div>
+                <div class="context-item" @click="addNode('GetVar')"><span class="icon">data_object</span> Get Variable</div>
+                <div class="context-item" @click="addNode('Compare')"><span class="icon">balance</span> Compare</div>
+                <div class="context-item" @click="addNode('End')"><span class="icon">stop</span> End / Switch</div>
+                <hr style="border-color:#444; margin:4px 0" v-if="selectedNodeIds.size > 0">
+                <div class="context-item" @click="createGroup" v-if="selectedNodeIds.size > 0"><span class="icon">workspaces</span> Create Group</div>
+                <div class="context-item" @click="detachFromGroup" v-if="hasGroupedNodesSelected()"><span class="icon">link_off</span> Detach from Group</div>
+                <div class="context-item" @click="deleteSelected" v-if="selectedNodeIds.size > 0"><span class="icon">delete</span> Delete Selected</div>
+            </template>
+            <template v-if="ui.contextMenu.type === 'tree'">
+                <div class="context-item" v-if="ui.contextMenu.item.type === 'folder'" @click="addFolder(ui.contextMenu.item.id)"><span class="icon">create_new_folder</span> Subfolder</div>
+                <div class="context-item" v-if="ui.contextMenu.item.type === 'folder'" @click="addDialog(ui.contextMenu.item.id)"><span class="icon">add</span> New Dialog</div>
+                <div class="context-item" @click="renameTreeItem(ui.contextMenu.item)"><span class="icon">edit</span> Rename</div>
+                <div class="context-item" @click="deleteTreeItem(ui.contextMenu.item)"><span class="icon">delete</span> Delete</div>
+            </template>
+        </div>
+
+    </div>
+
+    <div v-if="showExport" class="overlay" @mousedown.self="showExport = false">
+        <div class="modal">
+            <h3 style="margin:0">Editor Data</h3>
+            <p class="text-sm text-muted" style="margin:5px 0 10px 0">Full project data including layout, folders, and settings. Use this to save your work.</p>
+            <div class="flex gap-sm">
+                 <button class="primary grow" @click="copyToClipboard('project')">Copy Project JSON</button>
+                 <button class="grow" @click="downloadFile('project')">Download File</button>
+            </div>
+            <button class="full-width mt-2" @click="triggerImport">Load Project File</button>
+            
+            <hr style="border-color: var(--border); width:100%; margin: 15px 0;">
+            
+            <h3 style="margin:0">Runtime Export</h3>
+            <p class="text-sm text-muted" style="margin:5px 0 10px 0">Optimized JSON for game engines. Visuals and folders are stripped. Text is extracted to a localization map.</p>
+            <div class="flex gap-sm">
+                 <button class="primary grow" @click="copyToClipboard('runtime')">Copy Runtime JSON</button>
+                 <button class="grow" @click="downloadFile('runtime')">Download File</button>
+            </div>
+
+            <hr style="border-color: var(--border); width:100%; margin: 15px 0;">
+            
+            <h3 style="margin:0">Voice Script (CSV)</h3>
+            <p class="text-sm text-muted" style="margin:5px 0 10px 0">Spreadsheet format for voice actors. Includes text, notes, characters, and IDs.</p>
+            <div class="flex gap-sm">
+                 <button class="primary grow" @click="downloadFile('csv')">Download Voice Script CSV</button>
+            </div>
+
+            <hr style="border-color: var(--border); width:100%; margin: 15px 0;">
+            
+            <h3 style="margin:0">Translation / Localization</h3>
+            <p class="text-sm text-muted" style="margin:5px 0 10px 0">Export standard CSV for translators.</p>
+            
+            <div class="flex gap-sm col mb-2">
+                <div class="flex gap-sm center">
+                    <label class="text-sm" style="width:100px">Base Lang:</label>
+                    <select v-model="loc.baseLang" class="text-sm grow">
+                        <option v-for="l in project.settings.languages" :value="l">{{ l }}</option>
+                    </select>
+                </div>
+                <div class="flex gap-sm center">
+                    <label class="text-sm" style="width:100px">Target Langs:</label>
+                    <div class="flex wrap gap-sm grow">
+                        <div v-for="l in project.settings.languages" :key="l" class="flex center">
+                            <input type="checkbox" :value="l" v-model="loc.targetLangs" :id="'chk-'+l">
+                            <label :for="'chk-'+l" class="text-sm ml-2">{{ l }}</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-sm">
+                 <button class="primary grow" @click="exportLocalization">Export Translation CSV</button>
+            </div>
+            
+            <div class="flex center mt-3 mb-3" style="border-top:1px solid #333;"></div>
+            
+            <p class="text-sm text-muted" style="margin:0 0 5px 0">Import Translation CSV:</p>
+            <button class="full-width" @click="triggerLocImport">Import Translation File</button>
+            <input type="file" id="locInput" style="display:none" @change="handleLocUpload" accept=".csv">
+
+        </div>
+    </div>
+    <input type="file" id="fileInput" style="display:none" @change="handleFileUpload">
+
+</div>
+
+<script>
+const { createApp, ref, reactive, computed, onMounted, nextTick, inject, provide, watch } = Vue;
+
+// --- Tree Browser Component ---
+const TreeBrowser = {
+    name: 'TreeBrowser',
+    props: ['parentId'],
+    setup(props) {
+        const project = inject('project');
+        const activeDialogId = inject('activeDialogId');
+        const validationErrors = inject('validationErrors');
+        const selectDialog = inject('selectDialog');
+        const setDrag = inject('setDrag');
+        const onDrop = inject('onDrop');
+        const openContextMenu = inject('openContextMenu');
+        
+        // GLOBAL STATE FOR EXPANSION
+        const expanded = inject('expandedFolderIds'); // NOW INJECTED
+
+        const myFolders = computed(() => project.folders.filter(f => f.parentId === props.parentId));
+        const myDialogs = computed(() => project.dialogs.filter(d => d.folderId === props.parentId));
+
+        const toggle = (id) => expanded.has(id) ? expanded.delete(id) : expanded.add(id);
+        const isOpen = (id) => expanded.has(id);
+        
+        return { project, activeDialogId, validationErrors, myFolders, myDialogs, toggle, isOpen, selectDialog, setDrag, onDrop, openContextMenu };
+    },
+    template: `
+        <div style="padding-left: 2px">
+            <div v-for="folder in myFolders" :key="'f'+folder.id">
+                <div class="tree-row" 
+                     draggable="true"
+                     @dragstart.stop="setDrag(folder.id, 'folder')"
+                     @dragover.prevent @drop.stop="onDrop(folder.id)"
+                     @contextmenu.stop.prevent="openContextMenu($event, {id: folder.id, type: 'folder'})"
+                     @click="toggle(folder.id)">
+                     <span class="icon" style="font-size:16px; color: #E8BF6A">{{ isOpen(folder.id) ? 'folder_open' : 'folder' }}</span>
+                     <span class="text-sm grow">{{ folder.name }}</span>
+                </div>
+                <div v-if="isOpen(folder.id)" class="tree-item">
+                    <tree-browser :parent-id="folder.id"></tree-browser>
+                </div>
+            </div>
+            <div v-for="dia in myDialogs" :key="'d'+dia.id">
+                <div class="tree-row" 
+                     :class="{ active: activeDialogId === dia.id }"
+                     draggable="true"
+                     @dragstart.stop="setDrag(dia.id, 'dialog')"
+                     @contextmenu.stop.prevent="openContextMenu($event, {id: dia.id, type: 'dialog'})"
+                     @click="selectDialog(dia.id)">
+                     <span v-if="validationErrors[dia.id]" class="icon warning-icon" style="font-size:14px; margin-right:4px;">warning</span>
+                     <span class="icon" style="font-size:16px">chat</span>
+                     <span class="text-sm grow">{{ dia.name }}</span>
+                </div>
+            </div>
+        </div>
+    `
+};
+
+const app = createApp({
+    components: { TreeBrowser },
+    setup() {
+        const project = reactive({
+            meta: { nextId: 0 },
+            settings: { languages: ['en'], currentLang: 'en' },
+            variables: [],
+            characters: [],
+            folders: [],
+            dialogs: []
+        });
+
+        const editor = reactive({ gridSize: 40, snap: true });
+        const activeDialogId = ref(1);
+        const ui = reactive({
+            sections: { settings: true, vars: true, chars: true, dialogs: true },
+            contextMenu: { visible: false, x: 0, y: 0, type: 'canvas', item: null }
+        });
+
+        // GLOBAL UI STATE
+        const expandedFolderIds = reactive(new Set());
+        const collapsedCharacterIds = reactive(new Set());
+        provide('expandedFolderIds', expandedFolderIds);
+
+        const toggleChar = (id) => collapsedCharacterIds.has(id) ? collapsedCharacterIds.delete(id) : collapsedCharacterIds.add(id);
+
+        // Localization State
+        const loc = reactive({
+            baseLang: 'en',
+            targetLangs: []
+        });
+
+        // --- Toast System ---
+        const toastSystem = reactive({
+            toasts: [],
+            isPaused: false
+        });
+
+        let toastIdCounter = 0;
+        const addToast = (message, type = 'info') => {
+            toastSystem.toasts.push({
+                id: ++toastIdCounter,
+                message,
+                type,
+                expanded: false,
+                remaining: 3000
+            });
+        };
+
+        const removeToast = (id) => {
+            const idx = toastSystem.toasts.findIndex(t => t.id === id);
+            if (idx > -1) toastSystem.toasts.splice(idx, 1);
+        };
+
+        const getToastIcon = (type) => {
+            switch(type) {
+                case 'success': return 'check_circle';
+                case 'error': return 'error';
+                case 'warning': return 'warning';
+                default: return 'info';
+            }
+        };
+
+        const needsExpand = (msg) => {
+            if (!msg) return false;
+            return msg.length > 110 || (msg.match(/\n/g) || []).length >= 3;
+        };
+
+        // --- Modal ---
+        const modal = reactive({ visible: false, type: 'confirm', title: '', message: '', inputValue: '', callback: null });
+        const modalInput = ref(null);
+
+        const showConfirm = (title, message, onOk) => {
+            modal.type = 'confirm';
+            modal.title = title;
+            modal.message = message;
+            modal.callback = onOk;
+            modal.visible = true;
+        };
+        
+        const showPrompt = (title, initVal, onOk) => {
+            modal.type = 'prompt';
+            modal.title = title;
+            modal.message = '';
+            modal.inputValue = initVal;
+            modal.callback = onOk;
+            modal.visible = true;
+            nextTick(() => { if(modalInput.value) modalInput.value.focus(); });
+        };
+
+        const closeModal = () => { modal.visible = false; modal.callback = null; };
+        const confirmModal = () => {
+            if (modal.callback) {
+                if (modal.type === 'prompt') modal.callback(modal.inputValue);
+                else modal.callback();
+            }
+            closeModal();
+        };
+
+        // --- Selection & Dragging ---
+        const selectedNodeIds = reactive(new Set()); 
+        const hoverGroupId = ref(null); 
+        const removeGroupId = ref(null); 
+
+        const isDraggingNode = ref(false);
+        const dragStartPos = { x: 0, y: 0 }; 
+        const cachedNodeSizes = {}; 
+        const initialNodePositions = {}; 
+
+        const dragState = reactive({ id: null, type: null });
+
+        // --- Box Selection State ---
+        const selectionRect = reactive({ visible: false, x: 0, y: 0, w: 0, h: 0, startX: 0, startY: 0 });
+        const isSelecting = ref(false);
+        const initialSelectionSnapshot = new Set();
+        const boxSelectCache = []; // Cache node rects during selection
+
+        provide('project', project);
+        provide('activeDialogId', activeDialogId);
+        
+        const selectDialog = (id) => {
+            activeDialogId.value = id;
+            selectedNodeIds.clear();
+            // Validate the newly opened dialog immediately
+            nextTick(() => { 
+                setTimeout(() => { 
+                    updateTick.value++; 
+                    fitView(); 
+                    markDialogDirty(id); 
+                }, 20); 
+            });
+        };
+        provide('selectDialog', selectDialog);
+        provide('setDrag', (id, type) => { dragState.id = id; dragState.type = type; });
+        
+        const handleDrop = (targetFolderId) => {
+            if (!dragState.id) return;
+            if (dragState.type === 'folder') {
+                if (dragState.id === targetFolderId) return;
+                let check = targetFolderId;
+                while(check !== null) {
+                    const f = project.folders.find(it => it.id === check);
+                    if(f && f.id === dragState.id) return;
+                    check = f ? f.parentId : null;
+                }
+                const folder = project.folders.find(f => f.id === dragState.id);
+                if (folder) folder.parentId = targetFolderId;
+            } else if (dragState.type === 'dialog') {
+                const dia = project.dialogs.find(d => d.id === dragState.id);
+                if (dia) dia.folderId = targetFolderId;
+            }
+            dragState.id = null;
+        };
+        provide('onDrop', handleDrop);
+        provide('openContextMenu', (e, item) => {
+             ui.contextMenu = { visible: true, x: e.clientX, y: e.clientY, type: 'tree', item };
+        });
+
+        // --- Graph Refs ---
+        const canvasRef = ref(null);
+        const pan = reactive({ x: 0, y: 0 });
+        const zoom = ref(1);
+        const isPanning = ref(false);
+        const selectedNodeId = ref(null);
+        const selectedConnectionId = ref(null);
+        const dragItem = ref(null);
+        const updateTick = ref(0); 
+
+        const isConnecting = ref(false);
+        const connStart = reactive({ nodeId: null, socket: null, type: null, isInput: false });
+        const mousePos = reactive({ x: 0, y: 0 }); 
+
+        const showExport = ref(false); 
+        const importData = ref('');
+        const newLang = ref('');
+
+        const activeDialog = computed(() => project.dialogs.find(d => d.id === activeDialogId.value));
+        const activeNodes = computed(() => activeDialog.value ? activeDialog.value.nodes : []);
+        const activeConnections = computed(() => activeDialog.value ? activeDialog.value.connections : []);
+
+        // --- SMART VALIDATION SYSTEM ---
+        const validationErrors = reactive({});
+        const dirtyScopes = reactive({ full: false, dialogs: new Set() });
+
+        const setError = (id, msgs) => {
+            if (!msgs || msgs.length === 0) delete validationErrors[id];
+            else validationErrors[id] = msgs;
+        };
+
+        const validateVars = () => {
+            const varNames = new Set();
+            project.variables.forEach(v => {
+                const errs = [];
+                if(!v.name || v.name.trim() === '') errs.push("Variable name cannot be empty.");
+                if(varNames.has(v.name)) errs.push("Duplicate variable name.");
+                varNames.add(v.name);
+                setError(v.id, errs);
+            });
+            // If vars change, all dialogs might be invalid
+            markAllDirty();
+        };
+
+        const validateChars = () => {
+            const charNames = new Set();
+            project.characters.forEach(c => {
+                 const errs = [];
+                 let hasError = false;
+                 if(!c.name || c.name.trim() === '') { errs.push("Character name cannot be empty."); hasError = true; }
+                 if(charNames.has(c.name)) { errs.push("Duplicate character name."); hasError = true; }
+                 charNames.add(c.name);
+
+                 if (c.variables) {
+                     const cVarNames = new Set();
+                     c.variables.forEach(cv => {
+                         const cvErrs = [];
+                         if(!cv.name || cv.name.trim() === '') { cvErrs.push("Variable name cannot be empty."); }
+                         if(cVarNames.has(cv.name)) { cvErrs.push("Duplicate variable name."); }
+                         cVarNames.add(cv.name);
+                         setError(cv.id, cvErrs);
+                         if(cvErrs.length > 0) hasError = true;
+                     });
+                 }
+                 if(hasError) errs.push("Contains errors.");
+                 setError(c.id, errs);
+            });
+        };
+
+        const validateDialog = (dialog) => {
+            if (!dialog) return;
+            const conns = dialog.connections;
+            const isConnected = (nodeId, socket) => {
+                return conns.some(c => (c.fromNode === nodeId && c.fromSocket === socket) || (c.toNode === nodeId && c.toSocket === socket));
+            };
+
+            let dialogHasErrors = false;
+            dialog.nodes.forEach(node => {
+                const errs = [];
+                
+                if(node.type === 'Text') {
+                     if(!node.data.key) errs.push("Missing Localization Key.");
+                     project.settings.languages.forEach(lang => {
+                         if(!node.data.translations[lang]) errs.push(`Missing '${lang}' translation.`);
+                     });
+                     if(!isConnected(node.id, 'in')) errs.push("Flow Input disconnected.");
+                     
+                     if(node.data.answers.length === 0) {
+                         if(!isConnected(node.id, 'out')) errs.push("Flow Output disconnected.");
+                     } else {
+                         node.data.answers.forEach((ans, idx) => {
+                             project.settings.languages.forEach(lang => {
+                                 if(!ans.translations[lang]) errs.push(`Answer ${idx+1} missing '${lang}'.`);
+                             });
+                             if(!isConnected(node.id, 'out_ans_'+idx)) errs.push(`Answer ${idx+1} flow disconnected.`);
+                         });
+                     }
+                } 
+                else if (node.type === 'SetVar') {
+                     if(!node.data.variableId) errs.push("No Variable selected.");
+                     if(!isConnected(node.id, 'in')) errs.push("Input disconnected.");
+                     if(!isConnected(node.id, 'out')) errs.push("Output disconnected.");
+                }
+                else if (node.type === 'GetVar') {
+                     if(!node.data.variableId) errs.push("No Variable selected.");
+                     if(!isConnected(node.id, 'out')) errs.push("Value Output unused.");
+                }
+                else if (node.type === 'Compare') {
+                     if(!isConnected(node.id, 'in')) errs.push("Input disconnected.");
+                     if(!isConnected(node.id, 'in_val')) errs.push("Data Input disconnected.");
+                     if(!isConnected(node.id, 'out_true') && !isConnected(node.id, 'out_false')) errs.push("Both outputs disconnected.");
+                }
+                else if (node.type === 'Start') {
+                     if(!isConnected(node.id, 'out')) errs.push("Start node disconnected.");
+                }
+                else if (node.type === 'End') {
+                     if(!isConnected(node.id, 'in')) errs.push("End node unreachable.");
+                }
+
+                setError(node.id, errs);
+                if (errs.length > 0) dialogHasErrors = true;
+            });
+            
+            setError(dialog.id, dialogHasErrors ? ["Dialog contains errors."] : []);
+        };
+
+        const validateAll = () => {
+            validateVars();
+            validateChars();
+            project.dialogs.forEach(d => validateDialog(d));
+        };
+
+        const markDialogDirty = (id) => dirtyScopes.dialogs.add(id);
+        const markActiveDirty = () => { if(activeDialogId.value) markDialogDirty(activeDialogId.value); };
+        const markAllDirty = () => dirtyScopes.full = true;
+
+        // Validation Loop - Runs on updateTick but only checks dirty scopes
+        watch(updateTick, () => {
+            if (dirtyScopes.full) {
+                validateAll();
+                dirtyScopes.full = false;
+                dirtyScopes.dialogs.clear();
+            } else if (dirtyScopes.dialogs.size > 0) {
+                dirtyScopes.dialogs.forEach(id => {
+                    const d = project.dialogs.find(dia => dia.id === id);
+                    if(d) validateDialog(d);
+                });
+                dirtyScopes.dialogs.clear();
+            }
+        });
+
+        provide('validationErrors', validationErrors);
+
+        // --- Logic ---
+        let resizeObserver = null;
+        onMounted(() => {
+            if(canvasRef.value) canvasRef.value.addEventListener('contextmenu', onContextMenu);
+            window.addEventListener('keydown', onKeyDown);
+            
+            // Initial Full Validation
+            validateAll();
+
+            setTimeout(() => { updateTick.value++; fitView(); }, 100);
+
+            // Toast timer
+            setInterval(() => {
+                if (toastSystem.isPaused) return;
+                for (let i = toastSystem.toasts.length - 1; i >= 0; i--) {
+                    const t = toastSystem.toasts[i];
+                    t.remaining -= 100;
+                    if (t.remaining <= 0) {
+                        toastSystem.toasts.splice(i, 1);
+                    }
+                }
+            }, 100);
+
+            // Resize Observer
+            resizeObserver = new ResizeObserver(() => {
+                if(!isDraggingNode.value) recalcGroupBounds();
+            });
+            const obsLoop = () => {
+                if (activeNodes.value) {
+                    activeNodes.value.forEach(n => {
+                        if (n.type !== 'Group') {
+                            const el = document.getElementById('node-' + n.id);
+                            if (el) resizeObserver.observe(el);
+                        }
+                    });
+                }
+            };
+            setInterval(obsLoop, 2000); 
+        });
+
+        const onKeyDown = (e) => {
+            if(modal.visible) return; // Modal open
+            if(['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
+
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (selectedConnectionId.value) {
+                    showConfirm('Delete Connection?', 'Are you sure you want to remove this connection?', () => {
+                        const idx = activeConnections.value.findIndex(c => c.id === selectedConnectionId.value);
+                        if(idx > -1) {
+                             activeConnections.value.splice(idx, 1);
+                             markActiveDirty();
+                        }
+                        selectedConnectionId.value = null;
+                    });
+                } else if (selectedNodeIds.size > 0) {
+                    deleteSelected();
+                }
+            }
+        };
+
+        const getUniqueId = () => ++project.meta.nextId;
+        const sanitize = (str) => str.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        
+        const getDialogPath = (dialogId) => {
+            const dialog = project.dialogs.find(d => d.id === dialogId);
+            if (!dialog) return '';
+            const parts = [];
+            let currentFolderId = dialog.folderId;
+            let safety = 0;
+            while (currentFolderId !== null && safety < 50) {
+                const folder = project.folders.find(f => f.id === currentFolderId);
+                if (folder) { parts.unshift(sanitize(folder.name)); currentFolderId = folder.parentId; } 
+                else { currentFolderId = null; }
+                safety++;
+            }
+            parts.push(sanitize(dialog.name));
+            return parts.join('.');
+        };
+
+        const addFolder = (parentId) => { project.folders.push({ id: getUniqueId(), name: 'New Folder', parentId }); ui.contextMenu.visible = false; };
+        const addDialog = (folderId) => {
+            const id = getUniqueId();
+            project.dialogs.push({ id, folderId, name: 'Dialog ' + id, nodes: [{ id: getUniqueId(), type: 'Start', x: 50, y: 50, data: {} }, { id: getUniqueId(), type: 'End', x: 400, y: 50, data: { nextDialogId: null } }], connections: [] });
+            selectDialog(id); ui.contextMenu.visible = false;
+        };
+        const renameTreeItem = (item) => {
+            const currentName = item.type === 'dialog' ? project.dialogs.find(d=>d.id===item.id).name : project.folders.find(f=>f.id===item.id).name;
+            showPrompt('Rename Item', currentName, (newName) => {
+                if (newName) { if(item.type === 'dialog') project.dialogs.find(d=>d.id===item.id).name = newName; else project.folders.find(f=>f.id===item.id).name = newName; } 
+            });
+            ui.contextMenu.visible = false;
+        };
+        const deleteTreeItem = (item) => {
+            showConfirm('Delete Item?', 'Are you sure? Folder contents will be moved to the parent.', () => {
+                if(item.type === 'dialog') {
+                    const idx = project.dialogs.findIndex(d => d.id === item.id);
+                    if(idx > -1) { project.dialogs.splice(idx, 1); if(activeDialogId.value === item.id && project.dialogs.length > 0) selectDialog(project.dialogs[0].id); }
+                } else {
+                    const folder = project.folders.find(f => f.id === item.id);
+                    if(folder) {
+                        const parent = folder.parentId;
+                        project.folders.filter(f => f.parentId === item.id).forEach(f => f.parentId = parent);
+                        project.dialogs.filter(d => d.folderId === item.id).forEach(d => d.folderId = parent);
+                        const idx = project.folders.indexOf(folder); project.folders.splice(idx, 1);
+                    }
+                }
+            });
+            ui.contextMenu.visible = false;
+        };
+
+        const getRelativeOffset = (childId, parentId) => {
+            const child = document.getElementById(childId);
+            const parent = document.getElementById(parentId);
+            if (!child || !parent) return { x: 0, y: 0 };
+            let el = child, x = 0, y = 0;
+            while (el && el !== parent && el !== document.body) { x += el.offsetLeft; y += el.offsetTop; el = el.offsetParent; }
+            return { x: x + child.offsetWidth / 2, y: y + child.offsetHeight / 2 };
+        };
+        
+        const getSocketPos = (nodeId, socketName) => {
+            const _ = updateTick.value; const node = activeNodes.value.find(n => n.id === nodeId); if (!node) return { x: 0, y: 0 };
+            const socketId = 'soc-' + nodeId + '-' + socketName; const nodeIdStr = 'node-' + nodeId;
+            const offset = getRelativeOffset(socketId, nodeIdStr);
+            if (offset.x === 0 && offset.y === 0) return { x: node.x + (socketName.includes('in') ? 0 : 200), y: node.y + 40 };
+            return { x: node.x + offset.x, y: node.y + offset.y };
+        };
+        const dragLinePath = computed(() => {
+            if (!isConnecting.value) return null;
+            const startPos = getSocketPos(connStart.nodeId, connStart.socket);
+            let sx = startPos.x, sy = startPos.y, ex = mousePos.x, ey = mousePos.y;
+            const isLeft = connStart.socket.includes('in');
+            const dist = Math.abs(sx - ex) * 0.5;
+            return `M ${sx} ${sy} C ${sx - (isLeft?dist:-dist)} ${sy}, ${ex + (isLeft?dist:-dist)} ${ey}, ${ex} ${ey}`;
+        });
+        const screenToWorld = (sx, sy) => ({ x: (sx - pan.x) / zoom.value, y: (sy - pan.y) / zoom.value });
+
+        const onNodeMouseDown = (node, e) => {
+            selectedConnectionId.value = null;
+            if (e.ctrlKey || e.shiftKey) {
+                if (selectedNodeIds.has(node.id)) selectedNodeIds.delete(node.id);
+                else selectedNodeIds.add(node.id);
+            } else {
+                if (!selectedNodeIds.has(node.id)) {
+                    selectedNodeIds.clear();
+                    selectedNodeIds.add(node.id);
+                }
+            }
+            selectedNodeId.value = node.id;
+        };
+
+        const onCanvasMouseDown = (e) => {
+            if (ui.contextMenu.visible) {
+                ui.contextMenu.visible = false;
+            }
+            if (e.button === 0 && !e.altKey) { // Left click for Selection
+                // Prepare box selection
+                isSelecting.value = true;
+                selectionRect.visible = true;
+                selectionRect.startX = e.clientX;
+                selectionRect.startY = e.clientY;
+                selectionRect.x = e.clientX;
+                selectionRect.y = e.clientY;
+                selectionRect.w = 0;
+                selectionRect.h = 0;
+
+                // Handle additive selection state
+                if (!e.shiftKey && !e.ctrlKey) {
+                    selectedNodeIds.clear();
+                }
+                initialSelectionSnapshot.clear();
+                selectedNodeIds.forEach(id => initialSelectionSnapshot.add(id));
+                selectedNodeId.value = null;
+                selectedConnectionId.value = null;
+
+                // Cache node positions for performant dragging
+                boxSelectCache.length = 0;
+                activeNodes.value.forEach(n => {
+                    let w = 240, h = 200;
+                    if (n.type === 'Group') {
+                        w = n.data.w; h = n.data.h;
+                    } else {
+                        const el = document.getElementById('node-' + n.id);
+                        if (el) { w = el.offsetWidth; h = el.offsetHeight; }
+                    }
+                    boxSelectCache.push({ id: n.id, x: n.x, y: n.y, w, h });
+                });
+
+            } else if (e.button === 1) { // Middle click for Pan
+                startPan(e);
+            }
+        };
+
+        const createGroup = () => {
+            if (selectedNodeIds.size === 0) return;
+            const ids = Array.from(selectedNodeIds);
+            const nodes = activeNodes.value.filter(n => ids.includes(n.id) && n.type !== 'Group');
+            if (nodes.length === 0) return;
+
+            const groupId = getUniqueId();
+            const groupNode = {
+                id: groupId, type: 'Group',
+                x: 0, y: 0,
+                data: { label: 'Group ' + groupId, w: 100, h: 100 }
+            };
+
+            activeNodes.value.push(groupNode);
+            nodes.forEach(n => n.groupId = groupId);
+            selectedNodeIds.clear();
+            recalcGroupBounds();
+            ui.contextMenu.visible = false;
+        };
+
+        const hasGroupedNodesSelected = () => {
+            for (let id of selectedNodeIds) {
+                const node = activeNodes.value.find(n => n.id === id);
+                if (node && node.groupId) return true;
+            }
+            return false;
+        };
+
+        const detachFromGroup = () => {
+            selectedNodeIds.forEach(id => {
+                const node = activeNodes.value.find(n => n.id === id);
+                if(node && node.groupId) node.groupId = null;
+            });
+            recalcGroupBounds();
+            ui.contextMenu.visible = false;
+        };
+
+        const recalcGroupBounds = (useCache = false) => {
+            const d = activeDialog.value;
+            if (!d) return;
+            const groups = d.nodes.filter(n => n.type === 'Group');
+            const groupsToDelete = new Set();
+
+            groups.forEach(g => {
+                const children = d.nodes.filter(n => n.groupId === g.id);
+                
+                if (children.length === 0) {
+                    groupsToDelete.add(g.id);
+                    return;
+                }
+
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                children.forEach(n => {
+                    if (n.x < minX) minX = n.x;
+                    if (n.y < minY) minY = n.y;
+                    
+                    let w = 240, h = 200;
+                    if (useCache && cachedNodeSizes[n.id]) {
+                        w = cachedNodeSizes[n.id].w;
+                        h = cachedNodeSizes[n.id].h;
+                    } else {
+                        const el = document.getElementById('node-' + n.id);
+                        if(el) { w = el.offsetWidth; h = el.offsetHeight; }
+                        else if(n.data.answers) h = 200 + n.data.answers.length * 35;
+                    }
+                    
+                    if (n.x + w > maxX) maxX = n.x + w;
+                    if (n.y + h > maxY) maxY = n.y + h;
+                });
+
+                const padding = 20; 
+                const headerOffset = 45; 
+
+                g.x = minX - padding;
+                g.y = minY - padding - headerOffset;
+                g.data.w = (maxX - minX) + (padding * 2);
+                g.data.h = (maxY - minY) + (padding * 2) + headerOffset;
+            });
+
+            if (groupsToDelete.size > 0) {
+                d.nodes = d.nodes.filter(n => !groupsToDelete.has(n.id));
+            }
+        };
+
+        const startNodeDrag = (node, e) => {
+            isDraggingNode.value = true;
+            dragItem.value = node;
+            onNodeMouseDown(node, e);
+            
+            activeNodes.value.forEach(n => {
+                const el = document.getElementById('node-' + n.id);
+                if(el) cachedNodeSizes[n.id] = { w: el.offsetWidth, h: el.offsetHeight };
+                initialNodePositions[n.id] = { x: n.x, y: n.y };
+            });
+
+            dragStartPos.x = e.clientX;
+            dragStartPos.y = e.clientY;
+            
+            ui.contextMenu.visible = false;
+        };
+
+        const handleMove = (e) => {
+            const rect = canvasRef.value.getBoundingClientRect();
+            
+            // Handle Box Selection
+            if (isSelecting.value) {
+                const currentX = e.clientX;
+                const currentY = e.clientY;
+
+                // UI Rect
+                const left = Math.min(selectionRect.startX, currentX);
+                const top = Math.min(selectionRect.startY, currentY);
+                const width = Math.abs(currentX - selectionRect.startX);
+                const height = Math.abs(currentY - selectionRect.startY);
+
+                selectionRect.x = left; selectionRect.y = top;
+                selectionRect.w = width; selectionRect.h = height;
+
+                // World Coordinates Rect
+                const worldLeft = (left - rect.left - pan.x) / zoom.value;
+                const worldTop = (top - rect.top - pan.y) / zoom.value;
+                const worldRight = worldLeft + (width / zoom.value);
+                const worldBottom = worldTop + (height / zoom.value);
+
+                // Check Overlaps
+                const inSelection = new Set();
+                for (const node of boxSelectCache) {
+                     // Simple AABB intersection
+                     if (node.x < worldRight && node.x + node.w > worldLeft &&
+                         node.y < worldBottom && node.y + node.h > worldTop) {
+                         inSelection.add(node.id);
+                     }
+                }
+
+                // Apply Selection (Additive/Subtractive logic via Shift)
+                if (e.shiftKey || e.ctrlKey) {
+                    // Additive: Initial + New
+                    selectedNodeIds.clear();
+                    initialSelectionSnapshot.forEach(id => selectedNodeIds.add(id));
+                    inSelection.forEach(id => selectedNodeIds.add(id));
+                } else {
+                    // Replace
+                    selectedNodeIds.clear();
+                    inSelection.forEach(id => selectedNodeIds.add(id));
+                }
+                return; // Skip other interactions
+            }
+
+            const wPos = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+            mousePos.x = wPos.x; mousePos.y = wPos.y;
+
+            if (isPanning.value) {
+                pan.x += e.movementX; pan.y += e.movementY;
+            } 
+            else if (isDraggingNode.value && dragItem.value) {
+                const totalDx = (e.clientX - dragStartPos.x) / zoom.value;
+                const totalDy = (e.clientY - dragStartPos.y) / zoom.value;
+
+                let snappedDx = totalDx;
+                let snappedDy = totalDy;
+
+                if (editor.snap) {
+                    const s = editor.gridSize;
+                    const initDragX = initialNodePositions[dragItem.value.id].x;
+                    const initDragY = initialNodePositions[dragItem.value.id].y;
+                    const targetX = Math.round((initDragX + totalDx) / s) * s;
+                    const targetY = Math.round((initDragY + totalDy) / s) * s;
+                    snappedDx = targetX - initDragX;
+                    snappedDy = targetY - initDragY;
+                }
+
+                const idsToMove = new Set(selectedNodeIds);
+                if (dragItem.value.type === 'Group') {
+                    activeNodes.value.forEach(n => {
+                        if (n.groupId === dragItem.value.id) idsToMove.add(n.id);
+                    });
+                }
+
+                idsToMove.forEach(id => {
+                    const n = activeNodes.value.find(node => node.id === id);
+                    if (n && initialNodePositions[id]) { 
+                        n.x = initialNodePositions[id].x + snappedDx;
+                        n.y = initialNodePositions[id].y + snappedDy;
+                    }
+                });
+                
+                hoverGroupId.value = null;
+                removeGroupId.value = null;
+
+                if (dragItem.value.type !== 'Group') {
+                    const cx = dragItem.value.x + 120;
+                    const cy = dragItem.value.y + 100;
+                    
+                    const target = activeNodes.value.find(g => 
+                        g.type === 'Group' && 
+                        cx > g.x && cx < g.x + g.data.w &&
+                        cy > g.y && cy < g.y + g.data.h
+                    );
+                    
+                    if (target) {
+                        if (dragItem.value.groupId !== target.id) hoverGroupId.value = target.id;
+                    } else if (dragItem.value.groupId) {
+                        if (e.shiftKey) {
+                            removeGroupId.value = dragItem.value.groupId;
+                        } else {
+                            recalcGroupBounds(true); 
+                        }
+                    }
+                }
+                updateTick.value++;
+            }
+        };
+
+        const handleUp = () => {
+            if (isSelecting.value) {
+                isSelecting.value = false;
+                selectionRect.visible = false;
+            }
+
+            if (isDraggingNode.value && dragItem.value && dragItem.value.type !== 'Group') {
+                if (hoverGroupId.value) {
+                    selectedNodeIds.forEach(id => {
+                        const n = activeNodes.value.find(node => node.id === id);
+                        if (n && n.type !== 'Group') n.groupId = hoverGroupId.value;
+                    });
+                } 
+                else if (removeGroupId.value) {
+                    selectedNodeIds.forEach(id => {
+                        const n = activeNodes.value.find(node => node.id === id);
+                        if (n && n.type !== 'Group' && n.groupId === removeGroupId.value) {
+                            n.groupId = null;
+                        }
+                    });
+                }
+                recalcGroupBounds();
+            }
+
+            isPanning.value = false; isDraggingNode.value = false; dragItem.value = null; 
+            hoverGroupId.value = null; removeGroupId.value = null;
+            if (isConnecting.value) isConnecting.value = false;
+        };
+
+        const startPan = (e) => isPanning.value = true;
+        const handleZoom = (e) => { const speed = 0.001; const delta = -e.deltaY * speed; zoom.value = Math.min(Math.max(zoom.value + delta, 0.2), 3); };
+        
+        const onContextMenu = (e) => {
+            e.preventDefault();
+            if (isConnecting.value) { isConnecting.value = false; return; }
+            ui.contextMenu = { visible: true, x: e.clientX, y: e.clientY, type: 'canvas', item: null };
+        };
+
+        const fitView = () => {
+            if (!activeNodes.value.length || !canvasRef.value) return;
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            activeNodes.value.forEach(n => {
+                if (n.x < minX) minX = n.x; if (n.y < minY) minY = n.y;
+                const w = n.type === 'Group' ? n.data.w : (document.getElementById('node-'+n.id)?.offsetWidth || 240);
+                const h = n.type === 'Group' ? n.data.h : (document.getElementById('node-'+n.id)?.offsetHeight || 200);
+                if (n.x + w > maxX) maxX = n.x + w; if (n.y + h > maxY) maxY = n.y + h;
+            });
+            minX -= 50; minY -= 50; maxX += 50; maxY += 50;
+            const graphW = maxX - minX; const graphH = maxY - minY;
+            const rect = canvasRef.value.getBoundingClientRect();
+            const scaleX = rect.width / graphW; const scaleY = rect.height / graphH;
+            let newZoom = Math.min(scaleX, scaleY); newZoom = Math.min(Math.max(newZoom, 0.2), 1.5);
+            zoom.value = newZoom;
+            pan.x = (rect.width - graphW * newZoom) / 2 - minX * newZoom;
+            pan.y = (rect.height - graphH * newZoom) / 2 - minY * newZoom;
+        };
+
+        const addNode = (type) => {
+            const id = getUniqueId();
+            const rect = canvasRef.value.getBoundingClientRect();
+            const wPos = screenToWorld(ui.contextMenu.x - rect.left, ui.contextMenu.y - rect.top);
+            const node = { id, type, x: wPos.x, y: wPos.y, data: {} };
+            
+            if(type === 'Text') {
+                const path = getDialogPath(activeDialogId.value);
+                // Added note field
+                node.data = { characterId: null, key: `${path}.text.${id}`, note: '', translations: {}, answers: [] };
+                project.settings.languages.forEach(l => node.data.translations[l] = '');
+            } else if (type === 'SetVar') node.data = { variableId: null, operation: '=', value: '' };
+            else if (type === 'GetVar') node.data = { variableId: null };
+            else if (type === 'Compare') node.data = { variableId: null, operator: '==', compareValue: '' };
+            else if (type === 'Start') node.data = {};
+            else if (type === 'End') node.data = { nextDialogId: null };
+
+            activeNodes.value.push(node);
+            ui.contextMenu.visible = false;
+            
+            // Mark validation needed
+            nextTick(() => { 
+                updateTick.value++; 
+                markActiveDirty(); 
+            });
+        };
+        const deleteNode = (id) => {
+            showConfirm("Delete Node?", "Are you sure you want to delete this node?", () => {
+                const nodeToDelete = activeNodes.value.find(n => n.id === id);
+                if (nodeToDelete && nodeToDelete.type === 'Group') {
+                    const children = activeNodes.value.filter(n => n.groupId === id);
+                    children.forEach(c => _deleteNodeInternal(c.id));
+                }
+                _deleteNodeInternal(id);
+                recalcGroupBounds();
+                markActiveDirty();
+                nextTick(() => updateTick.value++);
+            });
+        };
+        
+        const deleteSelected = () => {
+            if (selectedNodeIds.size === 0) return;
+            showConfirm("Delete Selected?", `Delete ${selectedNodeIds.size} node(s)?`, () => {
+                selectedNodeIds.forEach(id => {
+                    const nodeToDelete = activeNodes.value.find(n => n.id === id);
+                    if (nodeToDelete && nodeToDelete.type === 'Group') {
+                        const children = activeNodes.value.filter(n => n.groupId === id);
+                        children.forEach(c => _deleteNodeInternal(c.id));
+                    }
+                    _deleteNodeInternal(id);
+                });
+                selectedNodeIds.clear();
+                recalcGroupBounds();
+                markActiveDirty();
+                nextTick(() => updateTick.value++);
+            });
+            ui.contextMenu.visible = false;
+        };
+
+        const _deleteNodeInternal = (id) => {
+            const d = activeDialog.value;
+            d.nodes = d.nodes.filter(n => n.id !== id);
+            d.connections = d.connections.filter(c => c.fromNode !== id && c.toNode !== id);
+        };
+
+        const startConnect = (nodeId, socket, type, event) => {
+            isConnecting.value = true;
+            connStart.nodeId = nodeId; connStart.socket = socket; connStart.type = type; connStart.isInput = socket.includes('in');
+            selectedConnectionId.value = null;
+            const rect = canvasRef.value.getBoundingClientRect();
+            const wPos = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
+            mousePos.x = wPos.x; mousePos.y = wPos.y;
+        };
+        const finishConnect = (nodeId, socket, type) => {
+            if (!isConnecting.value) return;
+            if (connStart.nodeId === nodeId && connStart.socket === socket) { isConnecting.value = false; return; }
+            if (connStart.type !== type) { isConnecting.value = false; return; }
+            let fromNode, fromSocket, toNode, toSocket;
+            if (connStart.isInput) {
+                if (socket.includes('in')) { isConnecting.value = false; return; }
+                fromNode = nodeId; fromSocket = socket; toNode = connStart.nodeId; toSocket = connStart.socket;
+            } else {
+                if (!socket.includes('in') && socket !== 'in_val') { isConnecting.value = false; return; }
+                fromNode = connStart.nodeId; fromSocket = connStart.socket; toNode = nodeId; toSocket = socket;
+            }
+            const newConn = { id: getUniqueId(), fromNode, fromSocket, toNode, toSocket };
+            if (!activeConnections.value.find(c => c.fromNode === newConn.fromNode && c.fromSocket === newConn.fromSocket && c.toNode === newConn.toNode && c.toSocket === newConn.toSocket)) {
+                activeConnections.value.push(newConn);
+            }
+            isConnecting.value = false;
+            markActiveDirty();
+            nextTick(() => updateTick.value++);
+        };
+        const canDrop = (dir, type) => isConnecting.value && connStart.type === type && ((!connStart.isInput && dir === 'in') || (connStart.isInput && dir === 'out'));
+        const getPath = (conn) => {
+            const start = getSocketPos(conn.fromNode, conn.fromSocket);
+            const end = getSocketPos(conn.toNode, conn.toSocket);
+            const sx = start.x, sy = start.y, ex = end.x, ey = end.y, dist = Math.abs(sx - ex) * 0.5;
+            return `M ${sx} ${sy} C ${sx + dist} ${sy}, ${ex - dist} ${ey}, ${ex} ${ey}`;
+        };
+        
+        // MODIFIED: Just selects, no prompt
+        const selectConnection = (id) => { 
+            selectedConnectionId.value = id; 
+            selectedNodeIds.clear(); 
+            selectedNodeId.value = null;
+        };
+
+        const deleteDialog = (id) => {
+            showConfirm("Delete Dialog?", "This cannot be undone.", () => {
+                const idx = project.dialogs.findIndex(d => d.id === id);
+                if(idx > -1) {
+                    project.dialogs.splice(idx, 1);
+                    activeDialogId.value = project.dialogs.length ? project.dialogs[0].id : null;
+                    setError(id, []); // Clear errors for deleted dialog
+                }
+            });
+        };
+        const addVariable = () => {
+             project.variables.push({ id: getUniqueId(), name: 'newVar', type: 'bool', value: 'false' });
+             validateVars();
+        };
+        const deleteVariable = (id) => {
+            showConfirm("Delete Variable?", "References in nodes will break.", () => {
+                const i = project.variables.findIndex(v=>v.id===id); if(i>-1) project.variables.splice(i,1);
+                validateVars();
+                setError(id, []);
+            });
+        };
+        
+        const hslToHex = (h, s, l) => {
+            l /= 100;
+            const a = s * Math.min(l, 1 - l) / 100;
+            const f = n => {
+                const k = (n + h / 30) % 12;
+                const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+                return Math.round(255 * color).toString(16).padStart(2, '0');
+            };
+            return `#${f(0)}${f(8)}${f(4)}`;
+        };
+
+        const addCharacter = () => {
+             const h = Math.floor(Math.random() * 360);
+             const s = 40 + Math.floor(Math.random() * 20); // 40-60
+             const l = 50 + Math.floor(Math.random() * 20); // 50-70
+             project.characters.push({ id: getUniqueId(), name: 'New Char', color: hslToHex(h,s,l), description: '', variables: [] });
+             validateChars();
+        };
+
+        const addCharacterVariable = (charId) => {
+            const char = project.characters.find(c => c.id === charId);
+            if(char) {
+                if(!char.variables) char.variables = [];
+                char.variables.push({ id: getUniqueId(), name: 'cVar', type: 'bool', value: 'false' });
+                validateChars();
+            }
+        };
+
+        const deleteCharacterVariable = (charId, varId) => {
+            showConfirm("Delete Variable?", "References might break.", () => {
+                const char = project.characters.find(c => c.id === charId);
+                if(char && char.variables) {
+                    const idx = char.variables.findIndex(v => v.id === varId);
+                    if(idx > -1) char.variables.splice(idx, 1);
+                    validateChars();
+                    setError(varId, []);
+                }
+            });
+        };
+
+        const deleteCharacter = (id) => { 
+            showConfirm("Delete Character?", "Are you sure?", () => {
+                const i = project.characters.findIndex(c=>c.id===id); if(i>-1) project.characters.splice(i,1); 
+                validateChars();
+                setError(id, []);
+            });
+        };
+        const addLang = () => { 
+            if(newLang.value && !project.settings.languages.includes(newLang.value)) {
+                const l = newLang.value;
+                project.settings.languages.push(l);
+                project.dialogs.forEach(d => {
+                    d.nodes.forEach(n => {
+                        if(n.type === 'Text') {
+                            if(!n.data.translations[l]) n.data.translations[l] = '';
+                            n.data.answers.forEach(a => { if(!a.translations[l]) a.translations[l] = ''; });
+                        }
+                    });
+                });
+                markAllDirty();
+                nextTick(() => updateTick.value++);
+            }
+            newLang.value='';
+        };
+        const toggle = (s) => ui.sections[s] = !ui.sections[s];
+        
+        const addAnswer = (node) => {
+             // FIX 1: If it's the first answer, remove existing 'Next' connection
+             if (node.data.answers.length === 0) {
+                 activeDialog.value.connections = activeDialog.value.connections.filter(c => 
+                     !(c.fromNode === node.id && c.fromSocket === 'out')
+                 );
+             }
+
+             const ansId = Math.floor(Math.random() * 100000);
+             const path = getDialogPath(activeDialogId.value);
+             // Added note field to answer
+             const ans = { key: `${path}.text.${node.id}.answers.${ansId}`, note: '', translations: {} };
+             project.settings.languages.forEach(l => ans.translations[l] = '');
+             node.data.answers.push(ans);
+             markActiveDirty();
+             nextTick(() => { updateTick.value++; recalcGroupBounds(); });
+        };
+
+        const removeAnswer = (node, idx) => {
+            // FIX 2a: Remove connection for this answer
+            const sockToRemove = 'out_ans_' + idx;
+            activeDialog.value.connections = activeDialog.value.connections.filter(c => 
+                !(c.fromNode === node.id && c.fromSocket === sockToRemove)
+            );
+
+            // FIX 2b: Shift connections for subsequent answers
+            activeDialog.value.connections.forEach(c => {
+                if(c.fromNode === node.id && c.fromSocket.startsWith('out_ans_')) {
+                    const cIdx = parseInt(c.fromSocket.replace('out_ans_', ''));
+                    if(cIdx > idx) {
+                        c.fromSocket = 'out_ans_' + (cIdx - 1);
+                    }
+                }
+            });
+
+            node.data.answers.splice(idx, 1);
+            markActiveDirty();
+            nextTick(() => { updateTick.value++; recalcGroupBounds(); });
+        };
+        const getNodeColor = (t) => {
+            if(t==='Start') return '#569cd6'; if(t==='End') return '#d16969'; if(t==='Text') return '#ce9178';
+            if(t==='SetVar') return '#c586c0'; if(t==='GetVar') return '#4ec9b0'; if(t==='Compare') return '#dcdcaa';
+            return '#888';
+        };
+
+        const getNodeHeaderColor = (node) => {
+            if (node.type === 'Text' && node.data.characterId) {
+                const c = project.characters.find(ch => ch.id === node.data.characterId);
+                // Ensure we return a valid color, otherwise fallback
+                if (c && c.color) return c.color;
+            }
+            return getNodeColor(node.type);
+        };
+
+        const getNodeIcon = (t) => {
+            if(t==='Start') return 'play_arrow'; if(t==='End') return 'stop'; if(t==='Text') return 'chat_bubble';
+            if(t==='SetVar') return 'edit'; if(t==='GetVar') return 'data_object'; if(t==='Compare') return 'balance';
+            return '';
+        };
+        const getVarType = (id) => {
+            // Check global
+            let v = project.variables.find(v => v.id === id);
+            if(v) return v.type;
+            // Check characters
+            for(const c of project.characters) {
+                if(c.variables) {
+                    v = c.variables.find(v => v.id === id);
+                    if(v) return v.type;
+                }
+            }
+            return null;
+        };
+
+        const onSetVarChange = (node) => {
+             const type = getVarType(node.data.variableId);
+             if (!['int', 'float'].includes(type)) {
+                 node.data.operation = '=';
+             }
+        };
+
+        // NEW: AUTO DETECT TYPE FROM INPUT CONNECTION
+        const getConnectedType = (node) => {
+            const conn = activeConnections.value.find(c => c.toNode === node.id && c.toSocket === 'in_val');
+            if (conn) {
+                const sourceNode = activeNodes.value.find(n => n.id === conn.fromNode);
+                if (sourceNode) {
+                    if (sourceNode.type === 'GetVar' || sourceNode.type === 'SetVar') {
+                        return getVarType(sourceNode.data.variableId);
+                    }
+                }
+            }
+            return 'string';
+        };
+
+        const getProjectJson = () => {
+            // Save UI state to project
+            project.uiState = {
+                gridSize: editor.gridSize,
+                snap: editor.snap,
+                sections: ui.sections,
+                expandedFolders: Array.from(expandedFolderIds),
+                collapsedCharacters: Array.from(collapsedCharacterIds)
+            };
+            return JSON.stringify(project, null, 2);
+        };
+
+        // --- MODIFIED: Generate Runtime JSON ---
+        const getRuntimeJson = () => {
+            const runtime = {
+                settings: project.settings,
+                globalVars: {},
+                characters: {},
+                dialogs: []
+            };
+
+            // Helper to resolve var ID to name/scope
+            const resolveVar = (varId) => {
+                const g = project.variables.find(v => v.id === varId);
+                if(g) return { name: g.name, scope: 'global', type: g.type };
+                for(const c of project.characters) {
+                    if(c.variables) {
+                        const cv = c.variables.find(v => v.id === varId);
+                        if(cv) return { name: cv.name, scope: 'character', characterId: c.id, type: cv.type };
+                    }
+                }
+                return null;
+            };
+
+            // 1. Variables (Cleaned)
+            project.variables.forEach(v => runtime.globalVars[v.name] = { type: v.type, value: v.value });
+
+            // 2. Characters (Cleaned)
+            project.characters.forEach(c => {
+                runtime.characters[c.id] = { name: c.name, variables: {} };
+                if (c.variables) {
+                    c.variables.forEach(cv => runtime.characters[c.id].variables[cv.name] = { type: cv.type, value: cv.value });
+                }
+            });
+
+            // 3. Dialogs (Flattens folders, removes visual data, inlines translations)
+            project.dialogs.forEach(d => {
+                const cleanNodes = d.nodes
+                    .filter(n => n.type !== 'Group') // Ignore Groups in Runtime
+                    .map(n => {
+                    const clean = { id: n.id, type: n.type };
+
+                    if (n.type === 'Text') {
+                        clean.characterId = n.data.characterId;
+                        clean.textKey = n.data.key;
+                        
+                        // Inline Text Translations
+                        clean.translations = {};
+                        project.settings.languages.forEach(lang => {
+                            clean.translations[lang] = n.data.translations[lang] || '';
+                        });
+
+                        // Inline Choices/Answers as Array of Objects
+                        clean.choices = n.data.answers.map((a, idx) => {
+                             const choiceObj = {
+                                 id: 'out_ans_' + idx, // The anchor/socket ID to match connection.fromSocket
+                                 textKey: a.key,
+                                 translations: {}
+                             };
+                             project.settings.languages.forEach(lang => {
+                                 choiceObj.translations[lang] = a.translations[lang] || '';
+                             });
+                             return choiceObj;
+                        });
+                    }
+                    else if (n.type === 'Compare') {
+                         // Resolve input variable via connection
+                         const conn = d.connections.find(c => c.toNode === n.id && c.toSocket === 'in_val');
+                         if (conn) {
+                             const source = d.nodes.find(sn => sn.id === conn.fromNode);
+                             if (source && (source.type === 'GetVar' || source.type === 'SetVar')) {
+                                  const varInfo = resolveVar(source.data.variableId);
+                                  if (varInfo) clean.variable = varInfo;
+                             }
+                         }
+                         clean.operator = n.data.operator;
+                         clean.value = n.data.compareValue;
+                    }
+                    else if (n.type === 'SetVar') {
+                         const varInfo = resolveVar(n.data.variableId);
+                         if (varInfo) clean.variable = varInfo;
+                         clean.operation = n.data.operation;
+                         clean.value = n.data.value;
+                    }
+                    else if (n.type === 'GetVar') {
+                         const varInfo = resolveVar(n.data.variableId);
+                         if (varInfo) clean.variable = varInfo;
+                    }
+                    else if (n.type === 'End') {
+                        clean.nextDialogId = n.data.nextDialogId;
+                    }
+
+                    return clean;
+                });
+
+                // Connections: Remove visual styling, keep topology AND ID
+                const cleanConnections = d.connections.map(c => ({
+                    id: c.id, // Explicit ID for runtime traversal
+                    from: c.fromNode, 
+                    fromSocket: c.fromSocket,
+                    to: c.toNode, 
+                    toSocket: c.toSocket
+                }));
+
+                // Push object with ID included
+                runtime.dialogs.push({
+                    id: d.id,
+                    name: d.name,
+                    nodes: cleanNodes,
+                    connections: cleanConnections
+                });
+            });
+
+            return JSON.stringify(runtime, null, 2);
+        };
+
+        const getCsvData = (headers, rows) => {
+            // Convert to CSV String with escaping
+            return rows.map(r => r.map(field => {
+                const str = String(field || '');
+                // Escape quotes and wrap in quotes if contains comma, quote or newline
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                    return `"${str.replace(/"/g, '""')}"`;
+                }
+                return str;
+            }).join(',')).join('\n');
+        };
+
+        const getVoiceScriptData = () => {
+            const headers = ['Dialog', 'ID', 'Type', 'Character', 'Audio Note', ...project.settings.languages];
+            const rows = [headers];
+
+            project.dialogs.forEach(d => {
+                d.nodes.filter(n => n.type === 'Text').forEach(n => {
+                    let charName = "Narrator";
+                    if (n.data.characterId) {
+                        const c = project.characters.find(ch => ch.id === n.data.characterId);
+                        if (c) charName = c.name;
+                    }
+                    const row = [d.name, n.data.key, "Line", charName, n.data.note || ''];
+                    project.settings.languages.forEach(lang => row.push(n.data.translations[lang] || ''));
+                    rows.push(row);
+
+                    n.data.answers.forEach(ans => {
+                        const ansRow = [d.name, ans.key, "Choice", "Player", ans.note || ''];
+                        project.settings.languages.forEach(lang => ansRow.push(ans.translations[lang] || ''));
+                        rows.push(ansRow);
+                    });
+                });
+            });
+            return getCsvData(headers, rows);
+        };
+
+        const exportLocalization = () => {
+            if(!loc.targetLangs.length) { addToast("Please select at least one target language.", "warning"); return; }
+            
+            const headers = ['Key', 'Type', 'Character', 'Context/Description', 'Audio Note', `Source [${loc.baseLang}]`];
+            loc.targetLangs.forEach(l => headers.push(`Target [${l}]`));
+            
+            const rows = [headers];
+
+            project.dialogs.forEach(d => {
+                d.nodes.filter(n => n.type === 'Text').forEach(n => {
+                    let charName = "Narrator";
+                    let charDesc = "";
+                    if (n.data.characterId) {
+                        const c = project.characters.find(ch => ch.id === n.data.characterId);
+                        if (c) { charName = c.name; charDesc = c.description || ''; }
+                    }
+
+                    // Main Text
+                    const row = [
+                        n.data.key, 
+                        "Line", 
+                        charName, 
+                        charDesc, 
+                        n.data.note || '',
+                        n.data.translations[loc.baseLang] || ''
+                    ];
+                    loc.targetLangs.forEach(l => row.push(n.data.translations[l] || ''));
+                    rows.push(row);
+
+                    // Answers
+                    n.data.answers.forEach(ans => {
+                        const ansRow = [
+                            ans.key, 
+                            "Choice", 
+                            "Player", 
+                            "Player Selection", 
+                            ans.note || '',
+                            ans.translations[loc.baseLang] || ''
+                        ];
+                        loc.targetLangs.forEach(l => ansRow.push(ans.translations[l] || ''));
+                        rows.push(ansRow);
+                    });
+                });
+            });
+
+            const csvContent = getCsvData(headers, rows);
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const a = document.createElement('a'); 
+            a.href = URL.createObjectURL(blob); 
+            a.download = `localization_export_${Date.now()}.csv`; 
+            a.click();
+        };
+
+        const copyToClipboard = (mode) => {
+            const data = mode === 'runtime' ? getRuntimeJson() : getProjectJson();
+            navigator.clipboard.writeText(data).then(() => {
+                addToast(mode === 'runtime' ? "Runtime JSON copied!" : "Project JSON copied!", "success");
+            });
+        };
+
+        const downloadFile = (mode) => {
+            let data, type, ext, prefix;
+
+            if (mode === 'csv') {
+                data = getVoiceScriptData();
+                type = 'text/csv';
+                ext = 'csv';
+                prefix = 'voice_script';
+            } else {
+                data = mode === 'runtime' ? getRuntimeJson() : getProjectJson();
+                type = 'application/json';
+                ext = 'json';
+                prefix = mode === 'runtime' ? 'dialog_runtime' : 'dialog_project';
+            }
+            
+            const blob = new Blob([data], { type });
+            const a = document.createElement('a'); 
+            a.href = URL.createObjectURL(blob); 
+            a.download = `${prefix}_${Date.now()}.${ext}`; 
+            a.click();
+        };
+
+        const triggerImport = () => document.getElementById('fileInput').click();
+        const triggerLocImport = () => document.getElementById('locInput').click();
+        
+        const handleFileUpload = (e) => {
+            const f = e.target.files[0];
+            if(!f) return;
+            const r = new FileReader();
+            r.onload = (evt) => { importData.value = evt.target.result; processImport(); };
+            r.readAsText(f);
+        };
+
+        const handleLocUpload = (e) => {
+            const f = e.target.files[0];
+            if(!f) return;
+            const r = new FileReader();
+            r.onload = (evt) => { processLocImport(evt.target.result); };
+            r.readAsText(f);
+            e.target.value = ''; // Reset
+        };
+
+        // Simple CSV Parser handling quotes
+        const parseCSV = (str) => {
+            const arr = [];
+            let quote = false;
+            let col = 0, row = 0;
+            for (let c = 0; c < str.length; c++) {
+                let cc = str[c], nc = str[c+1];
+                if (!arr[row]) arr[row] = [];
+                if (!arr[row][col]) arr[row][col] = '';
+                
+                if (cc === '"' && quote && nc === '"') { arr[row][col] += '"'; ++c; continue; }
+                if (cc === '"') { quote = !quote; continue; }
+                if (cc === ',' && !quote) { ++col; continue; }
+                if (cc === '\r' && nc === '\n' && !quote) { ++row; col = 0; ++c; continue; }
+                if (cc === '\n' && !quote) { ++row; col = 0; continue; }
+                if (cc === '\r' && !quote) { ++row; col = 0; continue; }
+                
+                arr[row][col] += cc;
+            }
+            return arr;
+        };
+
+        const processLocImport = (csvText) => {
+            try {
+                const rows = parseCSV(csvText);
+                if(rows.length < 2) throw new Error("Empty or invalid CSV");
+                
+                const headers = rows[0];
+                const keyIdx = headers.findIndex(h => h.trim().toLowerCase() === 'key');
+                if(keyIdx === -1) throw new Error("Missing 'Key' column");
+
+                // Map columns to languages
+                const langMap = {}; // { colIndex: 'langCode' }
+                headers.forEach((h, idx) => {
+                    const match = h.match(/Target \[(.+)\]/i);
+                    if(match && match[1] && project.settings.languages.includes(match[1])) {
+                        langMap[idx] = match[1];
+                    }
+                });
+
+                if(Object.keys(langMap).length === 0) {
+                    addToast("No matching Target Language columns found. Headers must look like: Target [de]", "error");
+                    return;
+                }
+
+                let updatedCount = 0;
+                let ignoredCount = 0;
+
+                // Build fast lookup
+                const nodeMap = new Map();
+                const ansMap = new Map(); // Key -> { node, index }
+
+                project.dialogs.forEach(d => {
+                    d.nodes.filter(n => n.type === 'Text').forEach(n => {
+                        nodeMap.set(n.data.key, n);
+                        n.data.answers.forEach((ans, idx) => {
+                            ansMap.set(ans.key, { node: n, index: idx });
+                        });
+                    });
+                });
+
+                for(let i=1; i<rows.length; i++) {
+                    const row = rows[i];
+                    if(!row[keyIdx]) continue;
+                    
+                    const key = row[keyIdx];
+                    let targetObj = null;
+
+                    if(nodeMap.has(key)) {
+                        const n = nodeMap.get(key);
+                        targetObj = n.data;
+                    } else if (ansMap.has(key)) {
+                        const info = ansMap.get(key);
+                        targetObj = info.node.data.answers[info.index];
+                    } else {
+                        ignoredCount++;
+                        continue;
+                    }
+
+                    // Update found
+                    let rowUpdated = false;
+                    for(const colIdx in langMap) {
+                        const lang = langMap[colIdx];
+                        const newVal = row[colIdx];
+                        if(newVal !== undefined) {
+                            targetObj.translations[lang] = newVal;
+                            rowUpdated = true;
+                        }
+                    }
+                    if(rowUpdated) updatedCount++;
+                }
+
+                markAllDirty();
+                addToast(`Import Complete.\n\nKeys Updated: ${updatedCount}\nKeys Ignored (Unknown): ${ignoredCount}\nLanguages Processed: ${Object.values(langMap).join(', ')}`, "success");
+
+            } catch (e) {
+                addToast("Error importing CSV: " + e.message, "error");
+            }
+        };
+
+        const processImport = () => {
+            try {
+                // Strict JSON Parse
+                const d = JSON.parse(importData.value);
+                
+                if(d.dialogs) { 
+                    if (!d.folders) d.folders = [];
+                    if(d.characters) {
+                        d.characters.forEach(c => {
+                            if(!c.variables) c.variables = [];
+                            if(!c.description) c.description = ''; // Init description
+                        });
+                    }
+                    d.dialogs.forEach(dialog => {
+                        if (dialog.folderId === undefined) dialog.folderId = null;
+                        dialog.nodes.forEach(n => {
+                            // Recover/Validate Data Structures
+                            if(n.type === 'Text') {
+                                // Init new note field if missing
+                                if(n.data.note === undefined) n.data.note = '';
+
+                                if(n.data.answers) {
+                                    n.data.answers.forEach(a => {
+                                        if(!a.translations) {
+                                            a.translations = {};
+                                            project.settings.languages.forEach(l => a.translations[l] = a.text || '');
+                                            delete a.text;
+                                        }
+                                        if(!a.key) a.key = 'ANS_' + Math.floor(Math.random() * 10000);
+                                        // Init new note field if missing
+                                        if(a.note === undefined) a.note = '';
+                                    });
+                                }
+                            }
+                            if(n.type === 'Compare' && !n.data.compType) {
+                                n.data.compType = 'string';
+                            }
+                        });
+                    });
+                    
+                    Object.assign(project, d); 
+                    
+                    // LOAD UI STATE
+                    if (project.uiState) {
+                        if(project.uiState.gridSize) editor.gridSize = project.uiState.gridSize;
+                        if(project.uiState.snap !== undefined) editor.snap = project.uiState.snap;
+                        if(project.uiState.sections) Object.assign(ui.sections, project.uiState.sections);
+                        if(project.uiState.expandedFolders) {
+                            expandedFolderIds.clear();
+                            project.uiState.expandedFolders.forEach(id => expandedFolderIds.add(id));
+                        }
+                        if(project.uiState.collapsedCharacters) {
+                            collapsedCharacterIds.clear();
+                            project.uiState.collapsedCharacters.forEach(id => collapsedCharacterIds.add(id));
+                        }
+                    }
+
+                    showExport.value = false; 
+                    addToast("Project Loaded Successfully", "success"); 
+                    
+                    // Validate EVERYTHING after load
+                    markAllDirty();
+                    nextTick(() => { setTimeout(() => { updateTick.value++; fitView(); }, 100) });
+                }
+                else {
+                    addToast("Invalid Project Data Structure", "error");
+                }
+                nextTick(() => updateTick.value++);
+            } catch(e) { addToast("Error loading file: " + e.message, "error"); }
+        };
+
+        return {
+            project, activeDialogId, ui, canvasRef, pan, zoom, activeNodes, activeConnections,
+            showExport, importData, newLang, editor, loc,
+            dragLinePath, selectedNodeId, selectedConnectionId, selectedNodeIds, hoverGroupId, removeGroupId,
+            handleMove, handleUp, startPan, handleZoom, startNodeDrag, onNodeMouseDown, onCanvasMouseDown,
+            addNode, deleteNode, createGroup, detachFromGroup, hasGroupedNodesSelected, deleteSelected,
+            startConnect, finishConnect, canDrop,
+            addAnswer, removeAnswer, addDialog, deleteDialog, 
+            addVariable, deleteVariable, addCharacter, deleteCharacter, addCharacterVariable, deleteCharacterVariable,
+            addLang, toggle,
+            getNodeColor, getNodeHeaderColor, getNodeIcon, getPath, selectConnection, getVarType, onSetVarChange, getConnectedType,
+            copyToClipboard, downloadFile, exportLocalization, triggerImport, handleFileUpload, processImport,
+            triggerLocImport, handleLocUpload,
+            addFolder, onDrop: handleDrop, renameTreeItem, deleteTreeItem, fitView,
+            isDraggingNode,
+            modal, showConfirm, showPrompt, closeModal, confirmModal, modalInput,
+            selectionRect, isSelecting,
+            validationErrors, validateVars, validateChars, markActiveDirty,
+            collapsedCharacterIds, toggleChar, // New sidebar state
+            toastSystem, addToast, removeToast, getToastIcon, needsExpand
+        };
+    }
+}).mount('#app');
+</script>
+</body>
+</html>
