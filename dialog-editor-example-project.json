@@ -1,0 +1,525 @@
+{
+  "meta": {
+    "nextId": 66
+  },
+  "settings": {
+    "languages": [
+      "en"
+    ],
+    "currentLang": "en"
+  },
+  "variables": [
+    {
+      "id": 5,
+      "name": "canAccessArea",
+      "type": "bool",
+      "value": "false"
+    }
+  ],
+  "characters": [
+    {
+      "id": 1,
+      "name": "Hero",
+      "color": "#7dd8a0",
+      "description": "",
+      "variables": [
+        {
+          "id": 3,
+          "name": "hasKey",
+          "type": "bool",
+          "value": "false"
+        },
+        {
+          "id": 4,
+          "name": "level",
+          "type": "int",
+          "value": "42"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Villain",
+      "color": "#bc3838",
+      "description": "",
+      "variables": []
+    }
+  ],
+  "folders": [
+    {
+      "id": 9,
+      "name": "Level 1",
+      "parentId": null
+    },
+    {
+      "id": 10,
+      "name": "Level 2",
+      "parentId": null
+    },
+    {
+      "id": 11,
+      "name": "Stage 1",
+      "parentId": 9
+    },
+    {
+      "id": 12,
+      "name": "Stage 2",
+      "parentId": 9
+    }
+  ],
+  "dialogs": [
+    {
+      "id": 13,
+      "folderId": 11,
+      "name": "Start Dialog",
+      "nodes": [
+        {
+          "id": 14,
+          "type": "Start",
+          "x": -520,
+          "y": 160,
+          "data": {}
+        },
+        {
+          "id": 15,
+          "type": "End",
+          "x": 1720,
+          "y": 160,
+          "data": {
+            "nextDialogId": 16
+          }
+        },
+        {
+          "id": 22,
+          "type": "GetVar",
+          "x": -520,
+          "y": 280,
+          "data": {
+            "variableId": 5
+          }
+        },
+        {
+          "id": 23,
+          "type": "Compare",
+          "x": -200,
+          "y": 160,
+          "data": {
+            "variableId": null,
+            "operator": "==",
+            "compareValue": "",
+            "compType": "string"
+          }
+        },
+        {
+          "id": 24,
+          "type": "End",
+          "x": 1720,
+          "y": 760,
+          "data": {
+            "nextDialogId": null
+          }
+        },
+        {
+          "id": 28,
+          "type": "Text",
+          "x": 460,
+          "y": 745,
+          "data": {
+            "characterId": 2,
+            "key": "level-1.stage-1.start-dialog.text.01",
+            "note": "",
+            "translations": {
+              "en": "You shall not pass, my friend!"
+            },
+            "answers": []
+          },
+          "groupId": 45
+        },
+        {
+          "id": 31,
+          "type": "Text",
+          "x": 120,
+          "y": 160,
+          "data": {
+            "characterId": 2,
+            "key": "level-1.stage-1.start-dialog.text.02.01",
+            "note": "",
+            "translations": {
+              "en": "Ahh you made it, what do you want?"
+            },
+            "answers": [
+              {
+                "key": "level-1.stage-1.start-dialog.text.31.answers.86007",
+                "note": "",
+                "translations": {
+                  "en": "Give me your key!"
+                }
+              },
+              {
+                "key": "level-1.stage-1.start-dialog.text.31.answers.27704",
+                "note": "",
+                "translations": {
+                  "en": "Nothing, I will go home."
+                }
+              }
+            ]
+          },
+          "groupId": 44
+        },
+        {
+          "id": 33,
+          "type": "Text",
+          "x": 440,
+          "y": 160,
+          "data": {
+            "characterId": 2,
+            "key": "level-1.stage-1.start-dialog.text.02.02",
+            "note": "",
+            "translations": {
+              "en": "Okay, here is your key!"
+            },
+            "answers": []
+          },
+          "groupId": 44
+        },
+        {
+          "id": 35,
+          "type": "SetVar",
+          "x": 760,
+          "y": 160,
+          "data": {
+            "variableId": 3,
+            "operation": "=",
+            "value": "true"
+          },
+          "groupId": 44
+        },
+        {
+          "id": 37,
+          "type": "Text",
+          "x": 1080,
+          "y": 160,
+          "data": {
+            "characterId": 1,
+            "key": "level-1.stage-1.start-dialog.text.02.03",
+            "note": "",
+            "translations": {
+              "en": "Thanks, man!"
+            },
+            "answers": []
+          },
+          "groupId": 44
+        },
+        {
+          "id": 40,
+          "type": "SetVar",
+          "x": 1400,
+          "y": 160,
+          "data": {
+            "variableId": 4,
+            "operation": "+=",
+            "value": "10"
+          },
+          "groupId": 44
+        },
+        {
+          "id": 44,
+          "type": "Group",
+          "x": 100,
+          "y": 95,
+          "data": {
+            "label": "Positive Path",
+            "w": 1520,
+            "h": 559
+          }
+        },
+        {
+          "id": 45,
+          "type": "Group",
+          "x": -200,
+          "y": 680,
+          "data": {
+            "label": "Negative Path",
+            "w": 880,
+            "h": 837
+          }
+        },
+        {
+          "id": 50,
+          "type": "And",
+          "x": 140,
+          "y": 745,
+          "data": {
+            "inputCount": 2
+          },
+          "groupId": 45
+        },
+        {
+          "id": 53,
+          "type": "GetVar",
+          "x": -180,
+          "y": 745,
+          "data": {
+            "variableId": 49
+          },
+          "groupId": 45
+        },
+        {
+          "id": 55,
+          "type": "Text",
+          "x": 460,
+          "y": 1145,
+          "data": {
+            "characterId": 2,
+            "key": "level-1.stage-1.start-dialog.text.04",
+            "note": "",
+            "translations": {
+              "en": "Get out of my way!"
+            },
+            "answers": []
+          },
+          "groupId": 45
+        },
+        {
+          "id": 58,
+          "type": "FireEvent",
+          "x": 880,
+          "y": 880,
+          "data": {
+            "eventName": "End #2",
+            "inputCount": 0
+          }
+        },
+        {
+          "id": 61,
+          "type": "FireEvent",
+          "x": 880,
+          "y": 680,
+          "data": {
+            "eventName": "End #1",
+            "inputCount": 0
+          }
+        },
+        {
+          "id": 64,
+          "type": "FireEvent",
+          "x": 880,
+          "y": 1080,
+          "data": {
+            "eventName": "End #3",
+            "inputCount": 0
+          }
+        }
+      ],
+      "connections": [
+        {
+          "id": 25,
+          "fromNode": 14,
+          "fromSocket": "out",
+          "toNode": 23,
+          "toSocket": "in"
+        },
+        {
+          "id": 26,
+          "fromNode": 22,
+          "fromSocket": "out",
+          "toNode": 23,
+          "toSocket": "in_val"
+        },
+        {
+          "id": 34,
+          "fromNode": 31,
+          "fromSocket": "out_ans_0",
+          "toNode": 33,
+          "toSocket": "in"
+        },
+        {
+          "id": 36,
+          "fromNode": 33,
+          "fromSocket": "out",
+          "toNode": 35,
+          "toSocket": "in"
+        },
+        {
+          "id": 38,
+          "fromNode": 35,
+          "fromSocket": "out",
+          "toNode": 37,
+          "toSocket": "in"
+        },
+        {
+          "id": 41,
+          "fromNode": 23,
+          "fromSocket": "out_true",
+          "toNode": 31,
+          "toSocket": "in"
+        },
+        {
+          "id": 42,
+          "fromNode": 37,
+          "fromSocket": "out",
+          "toNode": 40,
+          "toSocket": "in"
+        },
+        {
+          "id": 43,
+          "fromNode": 40,
+          "fromSocket": "out",
+          "toNode": 15,
+          "toSocket": "in"
+        },
+        {
+          "id": 51,
+          "fromNode": 23,
+          "fromSocket": "out_val",
+          "toNode": 50,
+          "toSocket": "in_0"
+        },
+        {
+          "id": 52,
+          "fromNode": 50,
+          "fromSocket": "out_true",
+          "toNode": 28,
+          "toSocket": "in"
+        },
+        {
+          "id": 54,
+          "fromNode": 53,
+          "fromSocket": "out",
+          "toNode": 50,
+          "toSocket": "in_1"
+        },
+        {
+          "id": 56,
+          "fromNode": 50,
+          "fromSocket": "out_false",
+          "toNode": 55,
+          "toSocket": "in"
+        },
+        {
+          "id": 59,
+          "fromNode": 28,
+          "fromSocket": "out",
+          "toNode": 58,
+          "toSocket": "in"
+        },
+        {
+          "id": 60,
+          "fromNode": 58,
+          "fromSocket": "out",
+          "toNode": 24,
+          "toSocket": "in"
+        },
+        {
+          "id": 62,
+          "fromNode": 61,
+          "fromSocket": "out",
+          "toNode": 24,
+          "toSocket": "in"
+        },
+        {
+          "id": 63,
+          "fromNode": 31,
+          "fromSocket": "out_ans_1",
+          "toNode": 61,
+          "toSocket": "in"
+        },
+        {
+          "id": 65,
+          "fromNode": 55,
+          "fromSocket": "out",
+          "toNode": 64,
+          "toSocket": "in"
+        },
+        {
+          "id": 66,
+          "fromNode": 64,
+          "fromSocket": "out",
+          "toNode": 24,
+          "toSocket": "in"
+        }
+      ],
+      "variables": [
+        {
+          "id": 49,
+          "name": "isFriendly",
+          "type": "bool",
+          "value": "false",
+          "resetOnStart": true
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "folderId": 11,
+      "name": "End Dialog",
+      "nodes": [
+        {
+          "id": 17,
+          "type": "Start",
+          "x": -360,
+          "y": 80,
+          "data": {}
+        },
+        {
+          "id": 18,
+          "type": "End",
+          "x": 280,
+          "y": 80,
+          "data": {
+            "nextDialogId": null
+          }
+        },
+        {
+          "id": 46,
+          "type": "Text",
+          "x": -40,
+          "y": 80,
+          "data": {
+            "characterId": null,
+            "key": "level-1.stage-1.end-dialog.text.01.01",
+            "note": "",
+            "translations": {
+              "en": "The wind blows hard in this area!"
+            },
+            "answers": []
+          }
+        }
+      ],
+      "connections": [
+        {
+          "id": 47,
+          "fromNode": 17,
+          "fromSocket": "out",
+          "toNode": 46,
+          "toSocket": "in"
+        },
+        {
+          "id": 48,
+          "fromNode": 46,
+          "fromSocket": "out",
+          "toNode": 18,
+          "toSocket": "in"
+        }
+      ],
+      "variables": []
+    }
+  ],
+  "uiState": {
+    "gridSize": 40,
+    "snap": true,
+    "sections": {
+      "settings": true,
+      "vars": true,
+      "chars": true,
+      "dialogs": true
+    },
+    "expandedFolders": [
+      9,
+      10,
+      11
+    ],
+    "collapsedCharacters": [],
+    "overlayCollapsed": false
+  }
+}
