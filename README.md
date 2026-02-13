@@ -52,6 +52,11 @@ The editor features a comprehensive set of nodes to handle flow and data:
 * **Set Variable:** Modify Global, Character, or Dialog variables (Operations: `=`, `+=`, `-=`).
 * **Get Variable:** Retrieve the current value of a variable to use in logic.
 
+### Math & Operations
+* **Add / Subtract / Multiply / Divide:** Perform basic arithmetic operations on numeric variables. 
+    * Takes two inputs (A and B).
+    * Dynamically evaluates output types (e.g., if you add an `int` and a `float`, the output is automatically typed as a `float`).
+
 ### Logic & Branching
 * **Compare:** Compare two values (Int, Float, String, Bool) using operators (`==`, `!=`, `<`, `>`, `contains`) to branch the flow (True/False).
 * **Logic Gates:** Combine multiple boolean inputs to drive complex logic.
@@ -72,7 +77,6 @@ The editor features a comprehensive set of nodes to handle flow and data:
 | :--- | :--- |
 | **Undo** | `Ctrl + Z` |
 | **Redo** | `Ctrl + Y` |
-| **Reset view** | `Ctrl + R` |
 | **Open Context Menu** | `Ctrl + Space` |
 | **Delete Selection** | `Delete` or `Backspace` |
 | **Pan Canvas** | Middle Mouse Button |
@@ -138,4 +142,4 @@ The editor exports a clean, engine-agnostic JSON format designed for easy parsin
       ]
     }
   ]
-}
+}```
