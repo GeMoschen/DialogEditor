@@ -10,6 +10,7 @@ A robust, single-file visual editor for creating branching narratives, game dial
     * Revert almost any action (Move, Connect, Delete, Property Change) using the Toolbar or Keyboard Shortcuts (**Ctrl+Z** / **Ctrl+Y**).
 * **Visual Node Graph:**
     * **Infinite Canvas:** Pan and zoom freely.
+    * **Fast Workflow:** Quick context menu (`Ctrl + Space`) with full keyboard navigation and search, plus drag-and-drop variables directly from the sidebar.
     * **Overlay Toolbar:** Quick access to History, View Reset, and Export tools.
     * **Organization:** Drag-and-drop nodes, grid snapping, and box selection.
     * **Grouping:** Use Group nodes to organize complex logic clusters visually.
@@ -71,6 +72,8 @@ The editor features a comprehensive set of nodes to handle flow and data:
 | :--- | :--- |
 | **Undo** | `Ctrl + Z` |
 | **Redo** | `Ctrl + Y` |
+| **Reset view** | `Ctrl + R` |
+| **Open Context Menu** | `Ctrl + Space` |
 | **Delete Selection** | `Delete` or `Backspace` |
 | **Pan Canvas** | Middle Mouse Button |
 | **Select Multiple** | Left Click + Drag |
@@ -82,6 +85,8 @@ The editor features a comprehensive set of nodes to handle flow and data:
 2.  **Cast:** Create Characters, assign their specific text colors, and define character-specific variables (e.g., `trustLevel`).
 3.  **Local Variables:** Use the top-right overlay to define variables specific to the current dialog (e.g., `loopCount`), with optional "Reset on Start" behavior.
 4.  **Graphing:**
+    * Press `Ctrl + Space` to quickly search and add new nodes via the keyboard.
+    * Drag and drop variables directly from the sidebar onto the canvas to instantly spawn `GetVar` nodes. Drop them onto existing `SetVar` or `GetVar` nodes to reassign them.
     * Connect `Start` nodes to `Text` nodes.
     * Add choices to Text nodes and attach logic to **Conditional Inputs**.
     * Use **Fire Event** nodes to trigger scripts in your engine (e.g., "AddQuestItem").
