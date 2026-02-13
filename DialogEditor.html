@@ -670,6 +670,10 @@ const makeLogicGate = (name) => ({
     category: 'Logic', name: name + ' Gate', icon: 'hub', color: '#4FC1FF',
     initData: (ctx) => ({ inputCount: 2 }),
     ui: [
+        { type: 'row', justify: 'left', class:'mb-2 center', items: [
+            { type: 'socket', id: 'in', dir: 'in', sockType: 'flow' },
+            { type: 'label', text: 'In', class:'ml-2 text-muted' }
+        ]},
         { type: 'dynamic_sockets', model: 'inputCount', idPrefix: 'in_', dir: 'in', sockType: 'bool', labelPrefix: 'In ', showControls: true, min: 2, label: 'Inputs' },
         { type: 'row', justify: 'right', class:'mt-2', items: [ { type: 'label', text: 'True', class:'mr-2' }, { type: 'socket', id: 'out_true', dir: 'out', sockType: 'flow' } ] },
         { type: 'row', justify: 'right', class:'mt-1', items: [ { type: 'label', text: 'False', class:'mr-2' }, { type: 'socket', id: 'out_false', dir: 'out', sockType: 'flow' } ] },
@@ -681,6 +685,13 @@ const makeMathNode = (name, icon) => ({
     category: 'Math', name: name, icon: icon, color: '#d7bde2',
     initData: (ctx) => ({}),
     ui: [
+        { type: 'row', class:'mb-2 center', items: [
+            { type: 'socket', id: 'in', dir: 'in', sockType: 'flow' },
+            { type: 'label', text: 'In', class:'ml-2 text-muted' },
+            { type: 'label', text: '', class:'grow' },
+            { type: 'label', text: 'Out', class:'mr-2 text-muted' },
+            { type: 'socket', id: 'out', dir: 'out', sockType: 'flow' }
+        ]},
         { type: 'row', justify: 'left', class:'mb-1 gap-sm center', items: [
             { type: 'socket', id: 'in_A', dir: 'in', sockType: 'number' },
             { type: 'label', text: 'A' },
@@ -1005,6 +1016,19 @@ const app = createApp({
                 else if (node.type === 'Start') { if(!isConnected(node.id, 'out')) errs.push("Start node disconnected."); }
                 else if (node.type === 'End') { if(!isConnected(node.id, 'in')) errs.push("End node unreachable."); }
                 else if (node.type === 'FireEvent') { if(!node.data.eventName) errs.push("Missing Event Name."); if(!isConnected(node.id, 'in')) errs.push("Input disconnected."); if(!isConnected(node.id, 'out')) errs.push("Output disconnected."); }
+                
+                if (['Add', 'Subtract', 'Multiply', 'Divide'].includes(node.type)) {
+                    if (isConnected(node.id, 'in') && !isConnected(node.id, 'out')) {
+                        errs.push("Flow Output required when Flow Input is connected.");
+                    }
+                }
+                
+                if (['And', 'Or', 'XOr', 'NAnd', 'NOr'].includes(node.type)) {
+                    if (isConnected(node.id, 'in') && !isConnected(node.id, 'out_true') && !isConnected(node.id, 'out_false')) {
+                        errs.push("At least one Flow Output (True/False) required when Flow Input is connected.");
+                    }
+                }
+
                 setError(node.id, errs); if (errs.length > 0) dialogHasErrors = true;
             });
             setError(dialog.id, dialogHasErrors ? ["Dialog contains errors."] : []);

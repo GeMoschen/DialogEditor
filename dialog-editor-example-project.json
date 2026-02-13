@@ -1,6 +1,6 @@
 {
   "meta": {
-    "nextId": 66
+    "nextId": 73
   },
   "settings": {
     "languages": [
@@ -14,6 +14,12 @@
       "name": "canAccessArea",
       "type": "bool",
       "value": "false"
+    },
+    {
+      "id": 71,
+      "name": "xpUpgrade",
+      "type": "int",
+      "value": "10"
     }
   ],
   "characters": [
@@ -139,7 +145,7 @@
           "id": 31,
           "type": "Text",
           "x": 120,
-          "y": 160,
+          "y": 40,
           "data": {
             "characterId": 2,
             "key": "level-1.stage-1.start-dialog.text.02.01",
@@ -170,7 +176,7 @@
           "id": 33,
           "type": "Text",
           "x": 440,
-          "y": 160,
+          "y": 40,
           "data": {
             "characterId": 2,
             "key": "level-1.stage-1.start-dialog.text.02.02",
@@ -186,7 +192,7 @@
           "id": 35,
           "type": "SetVar",
           "x": 760,
-          "y": 160,
+          "y": 40,
           "data": {
             "variableId": 3,
             "operation": "=",
@@ -198,7 +204,7 @@
           "id": 37,
           "type": "Text",
           "x": 1080,
-          "y": 160,
+          "y": 40,
           "data": {
             "characterId": 1,
             "key": "level-1.stage-1.start-dialog.text.02.03",
@@ -214,11 +220,11 @@
           "id": 40,
           "type": "SetVar",
           "x": 1400,
-          "y": 160,
+          "y": 40,
           "data": {
             "variableId": 4,
             "operation": "+=",
-            "value": "10"
+            "value": ""
           },
           "groupId": 44
         },
@@ -226,11 +232,11 @@
           "id": 44,
           "type": "Group",
           "x": 100,
-          "y": 95,
+          "y": -25,
           "data": {
             "label": "Positive Path",
             "w": 1520,
-            "h": 678
+            "h": 695
           }
         },
         {
@@ -241,7 +247,7 @@
           "data": {
             "label": "Negative Path",
             "w": 880,
-            "h": 1000
+            "h": 999
           }
         },
         {
@@ -309,6 +315,16 @@
             "eventName": "End #3",
             "inputCount": 0
           }
+        },
+        {
+          "id": 72,
+          "type": "GetVar",
+          "x": 1080,
+          "y": 520,
+          "data": {
+            "variableId": 71
+          },
+          "groupId": 44
         }
       ],
       "connections": [
@@ -437,6 +453,20 @@
           "fromSocket": "out",
           "toNode": 24,
           "toSocket": "in"
+        },
+        {
+          "id": 67,
+          "fromNode": 23,
+          "fromSocket": "out_false",
+          "toNode": 50,
+          "toSocket": "in"
+        },
+        {
+          "id": 73,
+          "fromNode": 72,
+          "fromSocket": "out",
+          "toNode": 40,
+          "toSocket": "in_val"
         }
       ],
       "variables": [
