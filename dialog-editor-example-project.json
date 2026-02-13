@@ -114,7 +114,7 @@
           "id": 24,
           "type": "End",
           "x": 1720,
-          "y": 760,
+          "y": 800,
           "data": {
             "nextDialogId": null
           }
@@ -122,8 +122,8 @@
         {
           "id": 28,
           "type": "Text",
-          "x": 460,
-          "y": 745,
+          "x": 440,
+          "y": 880,
           "data": {
             "characterId": 2,
             "key": "level-1.stage-1.start-dialog.text.01",
@@ -230,25 +230,25 @@
           "data": {
             "label": "Positive Path",
             "w": 1520,
-            "h": 559
+            "h": 678
           }
         },
         {
           "id": 45,
           "type": "Group",
-          "x": -200,
-          "y": 680,
+          "x": -220,
+          "y": 815,
           "data": {
             "label": "Negative Path",
             "w": 880,
-            "h": 837
+            "h": 1000
           }
         },
         {
           "id": 50,
           "type": "And",
-          "x": 140,
-          "y": 745,
+          "x": 120,
+          "y": 880,
           "data": {
             "inputCount": 2
           },
@@ -257,8 +257,8 @@
         {
           "id": 53,
           "type": "GetVar",
-          "x": -180,
-          "y": 745,
+          "x": -200,
+          "y": 880,
           "data": {
             "variableId": 49
           },
@@ -267,8 +267,8 @@
         {
           "id": 55,
           "type": "Text",
-          "x": 460,
-          "y": 1145,
+          "x": 440,
+          "y": 1360,
           "data": {
             "characterId": 2,
             "key": "level-1.stage-1.start-dialog.text.04",
@@ -283,8 +283,8 @@
         {
           "id": 58,
           "type": "FireEvent",
-          "x": 880,
-          "y": 880,
+          "x": 760,
+          "y": 1040,
           "data": {
             "eventName": "End #2",
             "inputCount": 0
@@ -293,8 +293,8 @@
         {
           "id": 61,
           "type": "FireEvent",
-          "x": 880,
-          "y": 680,
+          "x": 760,
+          "y": 800,
           "data": {
             "eventName": "End #1",
             "inputCount": 0
@@ -303,8 +303,8 @@
         {
           "id": 64,
           "type": "FireEvent",
-          "x": 880,
-          "y": 1080,
+          "x": 760,
+          "y": 1280,
           "data": {
             "eventName": "End #3",
             "inputCount": 0
